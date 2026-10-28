@@ -5,7 +5,7 @@ export const W = 880;
 export const H = 600;
 export const WALL = 168;
 export const DOOR = { x: 44, y: 190 };
-export const WALK_SPEED = 0.11; // world px per ms
+export const WALK_SPEED = 0.06; // world px per ms: matches the stride of the walk cycles (about 36 px per cycle)
 export const ORDER = ["lead", "plan", "dev", "test", "mkt", "design", "review"];
 export const coffeeSpot = (key) => ({ x: 100 + ORDER.indexOf(key) * 22, y: 188 });
 export const BOARD = { x: 446, y: 16, w: 180, h: 98 };

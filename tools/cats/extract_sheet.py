@@ -3,9 +3,10 @@
 Office cat sprite sheets from docs/design/cats/reference-cats.webp.
 
 The sheet's small frames are blurry, so every animation is built from the crisp portrait sprite
-(`portraits.crisp`, ~41×46 hard pixels): tail wag and blinking by moving a few pixels, a waddle
-walk by shearing/bobbing whole rows (no resampling, so edges stay sharp), and squash/stretch poses
-by area-averaging and then snapping back to the cat's own palette with a fresh 1 px outline.
+(`portraits.crisp`, ~41×46 hard pixels): tail wag and blinking by moving a few pixels, a real
+step cycle (one side's paws lifted at a time, body bobbing and leaning), stretch / hop by inserting or
+removing whole rows, and sleeping by dropping the head onto the body. Nothing is ever resampled, so
+every pixel stays a hard pixel.
 
 Run from the repo root:  python3 -I tools/cats/extract_sheet.py
 Output: public/assets/cats/<breed>.png + metadata.json, tools/cats/preview.png
@@ -27,52 +28,6 @@ NAMES = {"mochi": "모찌", "midnight": "까망", "cloud": "구름", "cream": "�
 def palette_of(a):
     px = a[a[..., 3] > 0][:, :3]
     return np.unique(px, axis=0)
-
-
-def snap_outline(rgb, solid, pal):
-    """snap colours to `pal` and give edge pixels the darkest colour around them"""
-    h, w = solid.shape
-    flat = rgb.reshape(-1, 3).astype(float)
-    d = ((flat[:, None, :] - pal[None, :, :].astype(float)) ** 2).sum(axis=2)
-    out = pal[d.argmin(axis=1)].reshape(h, w, 3).copy()
-    lum = out.astype(float) @ np.array([0.3, 0.59, 0.11])
-    res = out.copy()
-    for y in range(h):
-        for x in range(w):
-            if not solid[y, x]: continue
-            if any(not (0 <= y + dy < h and 0 <= x + dx < w and solid[y + dy, x + dx]) for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-                best, bl = out[y, x], 1e9
-                for dy in (-1, 0, 1):
-                    for dx in (-1, 0, 1):
-                        yy, xx = y + dy, x + dx
-                        if 0 <= yy < h and 0 <= xx < w and solid[yy, xx] and lum[yy, xx] < bl:
-                            best, bl = out[yy, xx], lum[yy, xx]
-                res[y, x] = best
-    return np.dstack([res, (solid * 255).astype(np.uint8)])
-
-
-def resample(a, w2, h2, pal):
-    """area-average to a new size, then back to the cat's palette (stays hard-edged)"""
-    h, w = a.shape[:2]
-    pm = Image.fromarray(np.dstack([a[..., :3] * (a[..., 3:] > 0), a[..., 3]]).astype(np.uint8), "RGBA").resize((w2, h2), Image.BOX)
-    p = np.asarray(pm).astype(float)
-    alpha = p[..., 3] / 255
-    rgb = np.where(alpha[..., None] > 0, p[..., :3] / np.maximum(alpha[..., None], 1e-6), 0)
-    return snap_outline(rgb, alpha >= 0.5, pal)
-
-
-def shear_bob(a, shear, bob):
-    """lean the top of the sprite sideways row by row and lift it: a waddle step, no resampling"""
-    h, w = a.shape[:2]
-    out = np.zeros((h + 4, w + 4, 4), np.uint8)
-    for y in range(h):
-        s = int(round(shear * (1 - y / h)))
-        ny = y + 4 - bob
-        if 0 <= ny < out.shape[0]:
-            xs = np.arange(w) + 2 + s
-            ok = (xs >= 0) & (xs < out.shape[1])
-            out[ny, xs[ok]] = a[y, ok]
-    return out
 
 
 def wag(a, dy):
@@ -147,21 +102,96 @@ def cell(a):
     return c
 
 
+TAIL = (9, 18)   # x < 9 and y >= 18: the tail
+HEAD_ROWS = 26   # head and body meet here
+SPLIT = 21       # centre column between the two sides
+CUT0, CUT = 40, 41  # rows below CUT0 are the legs; `CUT` is where a shin row is removed to lift a paw
+
+
+def dup_rows(a, at, n):
+    """n extra copies of row `at`: the sprite grows taller, every pixel stays a hard pixel"""
+    if n <= 0: return a
+    return np.concatenate([a[: at + 1], np.repeat(a[at: at + 1], n, axis=0), a[at + 1:]])
+
+
+def del_rows(a, at, n):
+    return np.concatenate([a[:at], a[at + n:]]) if n > 0 else a
+
+
+def step(a, lift_l, lift_r, bob, lean):
+    """one frame of the walk: a paw on one side lifted, the body up by `bob` and leaning by `lean`"""
+    h, w = a.shape[:2]
+    out = np.zeros_like(a)
+    for cols, lift in ((slice(0, SPLIT), lift_l), (slice(SPLIT, w), lift_r)):
+        rows = [y for y in range(CUT0, h) if not (CUT <= y < CUT + lift)]
+        for k, y in enumerate(rows):
+            out[CUT0 + k, cols] = a[y, cols]
+    for y in range(CUT0):
+        s = int(round(lean * (1 - y / CUT0)))
+        ny = y - bob
+        if ny < 0:
+            continue
+        xs = np.arange(w) + s
+        ok = (xs >= 0) & (xs < w)
+        m = a[y, ok, 3] > 0
+        out[ny, xs[ok][m]] = a[y, ok][m]
+    # the rows the body left behind are filled with its last row so the legs stay joined to it
+    for k in range(bob):
+        m = a[CUT0 - 1, :, 3] > 0
+        out[CUT0 - 1 - k, m] = a[CUT0 - 1, m]
+    return out
+
+
+def shift_rows(dst, src, dy):
+    h = src.shape[0]
+    for y in range(h):
+        ny = y + dy
+        if 0 <= ny < h:
+            m = src[y, :, 3] > 0
+            dst[ny, m] = src[y, m]
+    return dst
+
+
+def drop_head(a, closed, drop, breathe=0):
+    """sleeping: the head sinks `drop` rows onto the body (pure translation), eyes closed"""
+    h, w = a.shape[:2]
+    ys, xs = np.mgrid[0:h, 0:w]
+    solid = a[..., 3] > 0
+    tail = (xs < TAIL[0]) & (ys >= TAIL[1])
+    head_m = (ys < HEAD_ROWS) & ~tail & solid
+    body = np.zeros_like(a)
+    body[solid & ~head_m] = a[solid & ~head_m]
+    head = np.zeros_like(a)
+    head[head_m] = closed[head_m]
+    return shift_rows(body, head, drop + breathe)
+
+
+def quiet_row(a, lo=27, hi=38):
+    """the row that looks most like its neighbour: duplicating or deleting it is invisible"""
+    best, bd = lo, 1e18
+    for y in range(lo, hi):
+        both = (a[y, :, 3] > 0) & (a[y + 1, :, 3] > 0)
+        d = np.abs(a[y, both, :3].astype(int) - a[y + 1, both, :3].astype(int)).sum() / max(1, both.sum())
+        if (a[y, :, 3] > 0).sum() == (a[y + 1, :, 3] > 0).sum() and d < bd:
+            best, bd = y, d
+    return best
+
+
 def anims(base, key):
-    h, w = base.shape[:2]
-    pal = palette_of(base)
     closed = close_eyes(base, key)
     t0, t1, t2 = base, wag(base, -1), wag(base, -2)
-    c_t0 = closed
-    rs = lambda sx, sy, src=base: resample(src, max(1, round(w * sx)), max(1, round(h * sy)), pal)
+    row = quiet_row(base)
+    tall = lambda n: dup_rows(base, row, n)
+    hop_down = del_rows(base, row, 3)
     return {
         # name: (frames, fps, loop)
-        "sit": ([t0, t0, t0, t1, t2, t1, t0, t0, c_t0, t0, t1, t0], 4, True),
+        "sit": ([t0, t0, t0, t1, t2, t1, t0, t0, closed, t0, t1, t0], 4, True),
         "wash": ([base, head_tilt(closed, 2), head_tilt(closed, 3), head_tilt(closed, 2)], 4, True),
-        "sleep": ([rs(1.14, 0.66, closed), rs(1.14, 0.69, closed)], 1.2, True),
-        "stretch": ([base, rs(0.96, 1.08), rs(0.93, 1.14), rs(0.93, 1.14), rs(0.96, 1.08)], 3, False),
-        "jump": ([rs(1.08, 0.88), rs(0.94, 1.12)], 2, False),
-        "walk": ([shear_bob(base, 1, 0), shear_bob(base, 0, 2), shear_bob(base, -1, 0), shear_bob(base, 0, 2)], 7, True),
+        "sleep": ([drop_head(base, closed, 14), drop_head(base, closed, 14, 1)], 1.2, True),
+        "stretch": ([base, tall(2), tall(4), tall(4), tall(2)], 3, False),
+        "jump": ([hop_down, tall(5)], 2, False),
+        # two steps per cycle: left paw up, passing, right paw up, passing
+        "walk": ([wag(step(base, 4, 0, 0, 2), -1), wag(step(base, 0, 0, 2, 0), 0), wag(step(base, 0, 4, 0, -2), -2), wag(step(base, 0, 0, 2, 0), 0)], 10, True),
     }
 
 

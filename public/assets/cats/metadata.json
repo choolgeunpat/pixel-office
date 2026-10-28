@@ -40,13 +40,13 @@
     "walk": {
       "row": 5,
       "frames": 4,
-      "fps": 7,
+      "fps": 10,
       "loop": true
     },
     "walkfront": {
       "row": 5,
       "frames": 4,
-      "fps": 7,
+      "fps": 10,
       "loop": true
     }
   },

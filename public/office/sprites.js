@@ -48,28 +48,54 @@ export async function loadMeta() {
   return META;
 }
 
-/** colour lookup 0xRRGGBB → 0xRRGGBB for a look; each group keeps its tones' luminance order */
-function remapTable(look) {
+/**
+ * Recolour for a look. Each palette group (hair / skin / outfit) is a ramp from its darkest to its lightest
+ * tone; a pixel that is close to one of a group's colours takes the same place on the new ramp. Matching by
+ * nearness (not by exact colour) keeps frames that were edited, and so carry slightly different tones,
+ * from ending up half recoloured and speckled.
+ */
+function recolorer(look) {
   const meta = META[look.base];
-  const out = new Map();
+  const groups = [];
   const add = (colors, pair) => {
-    if (!pair || !colors?.length) return;
+    if (!pair || !Array.isArray(colors) || !colors.length) return;
     const cs = colors.map(hex);
     const ls = cs.map(lum);
-    const lo = Math.min(...ls);
-    const hi = Math.max(...ls);
-    const d = hex(pair[0]);
-    const l = hex(pair[1]);
-    cs.forEach((col, i) => {
-      const t = hi > lo ? (ls[i] - lo) / (hi - lo) : 0.5;
-      const v = [0, 1, 2].map((k) => Math.round(d[k] + (l[k] - d[k]) * t));
-      out.set((col[0] << 16) | (col[1] << 8) | col[2], (v[0] << 16) | (v[1] << 8) | v[2]);
-    });
+    groups.push({ cs, lo: Math.min(...ls), hi: Math.max(...ls), d: hex(pair[0]), l: hex(pair[1]) });
   };
   add(meta.palette.hair, HAIR_PAIRS[look.hair]);
   add(meta.palette.skin, SKIN_PAIRS[look.skin]);
   add(meta.palette.outfit, OUTFIT_PAIRS[look.outfit]);
-  return out;
+  if (!groups.length) return null;
+  const all = [];
+  for (const [gi, g] of groups.entries()) for (const c of g.cs) all.push([gi, c]);
+  const cache = new Map();
+  return (r, g, b) => {
+    const key = (r << 16) | (g << 8) | b;
+    let v = cache.get(key);
+    if (v !== undefined) return v;
+    let best = 1e9;
+    let bestG = -1;
+    const near = new Array(groups.length).fill(1e9);
+    for (const [gi, c] of all) {
+      const d = (c[0] - r) ** 2 + (c[1] - g) ** 2 + (c[2] - b) ** 2;
+      if (d < near[gi]) near[gi] = d;
+      if (d < best) [best, bestG] = [d, gi];
+    }
+    v = -1;
+    // close to one group's tone, and clearly closer to it than to any other group
+    if (bestG >= 0 && best <= 26 * 26) {
+      const other = Math.min(...near.filter((_, gi) => gi !== bestG), 1e9);
+      if (best <= 0.5 * other || best === 0) {
+        const G = groups[bestG];
+        const t = G.hi > G.lo ? Math.max(0, Math.min(1, (lum([r, g, b]) - G.lo) / (G.hi - G.lo))) : 0.5;
+        const n = [0, 1, 2].map((k) => Math.round(G.d[k] + (G.l[k] - G.d[k]) * t));
+        v = (n[0] << 16) | (n[1] << 8) | n[2];
+      }
+    }
+    cache.set(key, v);
+    return v;
+  };
 }
 
 const images = new Map();
@@ -119,14 +145,14 @@ export class Character {
       cv.height = im.naturalHeight;
       const ctx = cv.getContext("2d", { willReadFrequently: true });
       ctx.drawImage(im, 0, 0);
-      const table = remapTable(this.look);
-      if (table.size) {
+      const map = recolorer(this.look);
+      if (map) {
         const img = ctx.getImageData(0, 0, cv.width, cv.height);
         const p = img.data;
         for (let i = 0; i < p.length; i += 4) {
           if (!p[i + 3]) continue;
-          const v = table.get((p[i] << 16) | (p[i + 1] << 8) | p[i + 2]);
-          if (v !== undefined) {
+          const v = map(p[i], p[i + 1], p[i + 2]);
+          if (v >= 0) {
             p[i] = v >> 16;
             p[i + 1] = (v >> 8) & 255;
             p[i + 2] = v & 255;
@@ -137,6 +163,25 @@ export class Character {
       this.sheets.set(name, cv);
     });
     return null;
+  }
+
+  /** the recoloured sheet scaled up by a whole number N with nearest-neighbour (cached) */
+  scaled(name, N) {
+    const sheet = this.sheet(name);
+    if (!sheet) return null;
+    if (N === 1) return sheet;
+    const key = `${name}@${N}`;
+    let big = this.sheets.get(key);
+    if (!big) {
+      big = document.createElement("canvas");
+      big.width = sheet.width * N;
+      big.height = sheet.height * N;
+      const c = big.getContext("2d");
+      c.imageSmoothingEnabled = false;
+      c.drawImage(sheet, 0, 0, big.width, big.height);
+      this.sheets.set(key, big);
+    }
+    return big;
   }
 
   frameIndex(anim, t) {
@@ -156,16 +201,19 @@ export class Character {
     const meta = META[this.look.base];
     if (!meta) return;
     const name = sheetName(this.look.base, motion, dir);
-    const sheet = this.sheet(name);
-    if (!sheet) return;
+    if (!this.sheet(name)) return;
     const anim = meta.animations[name];
     const fi = this.frameIndex(anim, t);
     const W = meta.frameWidth;
     const H = meta.frameHeight - clipBottom;
     if (H <= 0) return;
     const sx = fi * (W + meta.padding);
-    // snap to device pixels so the sprite's pixels stay hard-edged at any scale
+    // "sharp bilinear": blow the sprite up by a whole number (hard pixels), then let a light bilinear
+    // take it to the exact device size, so a pixel is never doubled unevenly
     const k = ctx.getTransform().a || 1;
+    const N = Math.min(4, Math.max(1, Math.ceil(k - 1e-3)));
+    const big = this.scaled(name, N);
+    if (!big) return;
     const sn = (v) => Math.round(v * k) / k;
     const dx = sn(x - meta.anchor.x);
     const dy = sn(y - meta.anchor.y);
@@ -173,12 +221,14 @@ export class Character {
     const dh = Math.round(H * k) / k;
     ctx.save();
     ctx.globalAlpha = alpha;
+    ctx.imageSmoothingEnabled = Math.abs(k - N) > 1e-3;
+    ctx.imageSmoothingQuality = "low";
     if (dir === "left") {
       ctx.translate(dx + dw, dy);
       ctx.scale(-1, 1);
-      ctx.drawImage(sheet, sx, 0, W, H, 0, 0, dw, dh);
+      ctx.drawImage(big, sx * N, 0, W * N, H * N, 0, 0, dw, dh);
     } else {
-      ctx.drawImage(sheet, sx, 0, W, H, dx, dy, dw, dh);
+      ctx.drawImage(big, sx * N, 0, W * N, H * N, dx, dy, dw, dh);
     }
     ctx.restore();
   }

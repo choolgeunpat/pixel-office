@@ -9,7 +9,7 @@
 import { LAYOUT } from "./layout.js";
 
 const BASE = new URL("../assets/cats/", import.meta.url);
-const SPEED = 0.042; // world px per ms
+const SPEED = 0.045; // world px per ms (a walk cycle of 4 frames at 10 fps covers about 18 px)
 const HOP_MS = 520;
 
 export let CAT_META = null;

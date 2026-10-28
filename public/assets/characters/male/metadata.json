@@ -115,30 +115,6 @@
       "file": "walk.png",
       "direction": "front",
       "frameCount": 6,
-      "fps": 8,
-      "loop": true,
-      "hold": [
-        1,
-        1,
-        1,
-        1,
-        1,
-        1
-      ],
-      "frames": [
-        "idle_0+step:left,2",
-        "idle_0+step:left,1+breathe:1",
-        "idle_0",
-        "idle_0+step:right,2",
-        "idle_0+step:right,1+breathe:1",
-        "idle_0"
-      ],
-      "source": "reference+edited"
-    },
-    "walk_side": {
-      "file": "walk_side.png",
-      "direction": "side",
-      "frameCount": 6,
       "fps": 10,
       "loop": true,
       "hold": [
@@ -157,13 +133,41 @@
         "walk_4",
         "walk_5"
       ],
-      "source": "reference"
+      "source": "walk_cycles.py"
+    },
+    "walk_side": {
+      "file": "walk_side.png",
+      "direction": "side",
+      "frameCount": 8,
+      "fps": 12,
+      "loop": true,
+      "hold": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "frames": [
+        "walk_side_0",
+        "walk_side_1",
+        "walk_side_2",
+        "walk_side_3",
+        "walk_side_4",
+        "walk_side_5",
+        "walk_side_6",
+        "walk_side_7"
+      ],
+      "source": "walk_cycles.py"
     },
     "walk_back": {
       "file": "walk_back.png",
       "direction": "back",
       "frameCount": 6,
-      "fps": 8,
+      "fps": 10,
       "loop": true,
       "hold": [
         1,
@@ -174,14 +178,14 @@
         1
       ],
       "frames": [
-        "idle_0+back_view+step:left,2",
-        "idle_0+back_view+step:left,1+breathe:1",
-        "idle_0+back_view",
-        "idle_0+back_view+step:right,2",
-        "idle_0+back_view+step:right,1+breathe:1",
-        "idle_0+back_view"
+        "walk_back_0",
+        "walk_back_1",
+        "walk_back_2",
+        "walk_back_3",
+        "walk_back_4",
+        "walk_back_5"
       ],
-      "source": "edited-from-reference"
+      "source": "walk_cycles.py"
     },
     "run": {
       "file": "run.png",

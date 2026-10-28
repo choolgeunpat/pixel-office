@@ -4,8 +4,9 @@
  * Plan, general-purpose) and plugin agents (`my-plugin:reviewer`) all land
  * somewhere sensible.
  *
- * `look` is a palette config of the pixel-distric characters
- * (base male/female + hair/skin/outfit tints, see public/office/sprites.js).
+ * `look` is a palette config of the pixel-distric characters (base male/female + hair/skin tints, see
+ * public/office/sprites.js). Outfits keep their original colours: recolouring the shaded clothes of the
+ * sprites turned them into speckle, so roles are told apart by hair, skin and the colour of the desk.
  */
 
 export const LEAD = {
@@ -13,7 +14,7 @@ export const LEAD = {
   name: "팀장",
   en: "Claude",
   color: "#e8835a",
-  look: { base: "female", hair: "chestnut", skin: "original", outfit: "gold" },
+  look: { base: "female", hair: "chestnut", skin: "original", outfit: "original" },
 };
 
 export const ROLES = [
@@ -22,7 +23,7 @@ export const ROLES = [
     name: "기획",
     en: "Planner",
     color: "#a78bfa",
-    look: { base: "female", hair: "lavender", skin: "original", outfit: "purple" },
+    look: { base: "female", hair: "lavender", skin: "original", outfit: "original" },
     keywords: ["plan", "pm", "product", "spec", "architect", "explore", "research", "analyst", "기획"],
   },
   {
@@ -38,7 +39,7 @@ export const ROLES = [
     name: "테스트",
     en: "Tester",
     color: "#34d399",
-    look: { base: "female", hair: "teal", skin: "light", outfit: "green" },
+    look: { base: "female", hair: "teal", skin: "light", outfit: "original" },
     keywords: ["test", "qa", "debug", "verif", "valid", "e2e", "테스트"],
   },
   {
@@ -46,7 +47,7 @@ export const ROLES = [
     name: "마케팅",
     en: "Marketer",
     color: "#f472b6",
-    look: { base: "female", hair: "pink", skin: "tan", outfit: "pink" },
+    look: { base: "female", hair: "pink", skin: "tan", outfit: "original" },
     keywords: ["market", "growth", "copy", "seo", "content", "writer", "social", "brand", "마케팅"],
   },
   {
@@ -54,7 +55,7 @@ export const ROLES = [
     name: "디자인",
     en: "Designer",
     color: "#fbbf24",
-    look: { base: "male", hair: "blonde", skin: "light", outfit: "gold" },
+    look: { base: "male", hair: "blonde", skin: "light", outfit: "original" },
     keywords: ["design", "ui", "ux", "art", "visual", "figma", "디자인"],
   },
   {
@@ -62,7 +63,7 @@ export const ROLES = [
     name: "리뷰",
     en: "Reviewer",
     color: "#94a3b8",
-    look: { base: "male", hair: "silver", skin: "tan", outfit: "charcoal" },
+    look: { base: "male", hair: "silver", skin: "tan", outfit: "original" },
     keywords: ["review", "security", "audit", "critic", "lint", "리뷰"],
   },
 ];

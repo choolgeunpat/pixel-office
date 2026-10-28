@@ -351,8 +351,11 @@ const PHASE = {
 function pointsFor(loc, key) {
   const g = LAYOUT[key];
   if (loc === "away") return [DOOR];
-  // walk along the back of the desks: high enough that legs and shoes are not hidden by the desk top
-  if (loc === "seat") return [DOOR, { x: DOOR.x, y: g.seatY - 36 }, { x: g.seatX, y: g.seatY }];
+  // walk along a lane above the monitors (so legs and shoes are never hidden by them), then straight down to the seat
+  if (loc === "seat") {
+    const lane = g.top - (key === "lead" ? 6 : g.gy > 400 ? 40 : 30);
+    return [DOOR, { x: DOOR.x, y: lane }, { x: g.seatX, y: lane }, { x: g.seatX, y: g.seatY }];
+  }
   return [DOOR, coffeeSpot(key)];
 }
 

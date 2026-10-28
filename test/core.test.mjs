@@ -41,9 +41,18 @@ test("normalize reads delegation and todos", () => {
   assert.deepEqual(ev.delegate, { type: "planner", description: "PRD 작성" });
   const td = normalize({ ...base, hook_event_name: "PreToolUse", tool_name: "TodoWrite", tool_input: { todos: [{ content: "a", status: "completed" }, { content: "b", status: "weird" }] } }, T0);
   assert.deepEqual(td.todos, [
-    { text: "a", status: "completed" },
-    { text: "b", status: "pending" },
+    { text: "a", active: "a", status: "completed" },
+    { text: "b", active: "b", status: "pending" },
   ]);
+  const act = normalize({ ...base, hook_event_name: "PreToolUse", tool_name: "TodoWrite", tool_input: { todos: [{ content: "Fix login", activeForm: "Fixing login", status: "in_progress" }] } }, T0);
+  assert.equal(act.todos[0].active, "Fixing login");
+  const bash = (command) => normalize({ ...base, hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command } }, T0).cmdKind;
+  assert.equal(bash("npm test -- auth"), "test");
+  assert.equal(bash("npm install lodash"), "install");
+  assert.equal(bash("git commit -m x"), "git");
+  assert.equal(bash("npm run build"), "build");
+  assert.equal(bash("ls -la"), "look");
+  assert.equal(bash("node server.js"), "run");
 });
 
 function run(raws) {
@@ -99,4 +108,75 @@ test("listSessions orders by latest activity and picks the first prompt as title
       ["b", "", 1],
     ],
   );
+});
+
+test("requests become tickets, finished work earns coins and the company levels up", async () => {
+  const { Economy, levelFor } = await import("../public/lib/economy.js");
+  const o = run([
+    { hook_event_name: "UserPromptSubmit", prompt: "질문이에요" },
+    { hook_event_name: "Stop", last_assistant_message: "답변이에요" },
+    { hook_event_name: "UserPromptSubmit", prompt: "코드 고쳐줘" },
+    { hook_event_name: "PreToolUse", tool_name: "Edit", tool_input: { file_path: "a.ts" } },
+    { hook_event_name: "PreToolUse", tool_name: "TodoWrite", tool_input: { todos: [{ content: "a", status: "completed" }, { content: "b", status: "completed" }] } },
+    { hook_event_name: "Stop", last_assistant_message: "고쳤어요" },
+  ]);
+  assert.deepEqual(
+    o.tickets.map((t) => [t.title, t.status, t.tools]),
+    [
+      ["질문이에요", "done", 0],
+      ["코드 고쳐줘", "done", 2],
+    ],
+  );
+  // plain question 5 + request with tools 10 + two checked-off to-dos 2×2
+  assert.equal(o.earned, 5 + 10 + 4);
+
+  const e = new Economy(null);
+  assert.equal(e.level.name, "1인 기업");
+  const first = e.add(45, 1000);
+  assert.equal(first.levelUp.name, "스타트업");
+  assert.equal(levelFor(1500).name, "유니콘");
+});
+
+test("coins are counted once even when the same events are replayed", async () => {
+  const { Economy } = await import("../public/lib/economy.js");
+  const store = {};
+  globalThis.localStorage = { getItem: (k) => store[k] ?? null, setItem: (k, v) => (store[k] = v) };
+  try {
+    const a = new Economy("k");
+    a.add(10, 5);
+    a.add(10, 5); // same millisecond, a second reward
+    a.add(10, 6);
+    assert.equal(a.coins, 30);
+    const b = new Economy("k"); // page reload: the server replays the same events
+    b.add(10, 5);
+    b.add(10, 5);
+    b.add(10, 6);
+    assert.equal(b.coins, 30);
+    b.add(10, 7);
+    assert.equal(b.coins, 40);
+  } finally {
+    delete globalThis.localStorage;
+  }
+});
+
+test("idle workers take a coffee break, then nap", () => {
+  const o = run([
+    { hook_event_name: "PreToolUse", tool_name: "Read", tool_input: { file_path: "a.md" }, agent_id: "a1", agent_type: "planner" },
+    { hook_event_name: "SubagentStop", agent_id: "a1", agent_type: "planner" },
+  ]);
+  const plan = o.desks.plan;
+  const t = plan.lastTs;
+  assert.equal(deskLook(plan, t + 10_000).coffee, false);
+  assert.equal(deskLook(plan, t + 30_000).coffee, true);
+  assert.equal(deskLook(plan, t + 30_000).status, "커피 타임");
+  assert.equal(deskLook(plan, t + 100_000).anim, "sleep");
+});
+
+test("tool wording is plain language", async () => {
+  const { action } = await import("../public/lib/plain.js");
+  assert.equal(action("Read", "/w/src/a/b.ts").long, "자료를 읽고 있어요");
+  assert.equal(action("Read", "/w/src/a/b.ts").detail, "b.ts");
+  assert.equal(action("Bash", "", "test").short, "테스트 중");
+  assert.equal(action("Edit", "x/login.tsx").short, "수정하는 중");
+  assert.equal(action("mcp__slack__post", "").long, "연결된 앱을 쓰고 있어요");
 });

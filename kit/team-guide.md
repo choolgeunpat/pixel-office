@@ -12,5 +12,5 @@ This repo has a six-person team of subagents. Split non-trivial requests and del
 | `designer` | 디자인 | UI/UX, styling, accessibility |
 | `reviewer` | 리뷰 | code and security review before committing |
 
-Keep a TodoWrite list for multi-step work. Run independent parts in parallel when possible.
+Simple questions, quick answers and small edits you can do yourself in the main thread. Keep a TodoWrite list for multi-step work and give each item an activeForm in plain words (the Pixel Office whiteboard shows it to the user). Run independent parts in parallel when possible.
 <!-- /pixel-office:team -->

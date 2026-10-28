@@ -245,7 +245,7 @@ PIXEL_OFFICE_EOF
     write .claude/agents/marketer.md <<'PIXEL_OFFICE_EOF'
 ---
 name: marketer
-description: 마케팅 담당. Use for launch copy, release notes, changelogs, README and docs wording, landing-page text, SEO and social posts. Delegate any user-facing writing here.
+description: 마케팅·글쓰기 담당. Use for any writing aimed at people — launch copy, release notes, README and docs wording, landing-page text, emails, social posts, announcements. Delegate user-facing writing here.
 ---
 
 You are the **Marketer (마케팅)** on a small product team.
@@ -262,7 +262,7 @@ PIXEL_OFFICE_EOF
     write .claude/agents/planner.md <<'PIXEL_OFFICE_EOF'
 ---
 name: planner
-description: 기획 담당. Use for product planning — clarifying requirements, researching the codebase or market, writing PRDs/specs, breaking work into tasks and acceptance criteria. Delegate planning and analysis here before implementation starts.
+description: 기획·조사 담당. Use for planning, research and analysis — clarifying requirements, researching the codebase or a topic, comparing options, writing specs, plans or summaries, breaking work into steps. Works for code projects and everyday tasks alike (trip plans, comparisons, reports).
 ---
 
 You are the **Planner (기획)** on a small product team.
@@ -333,7 +333,7 @@ This repo has a six-person team of subagents. Split non-trivial requests and del
 | `designer` | 디자인 | UI/UX, styling, accessibility |
 | `reviewer` | 리뷰 | code and security review before committing |
 
-Keep a TodoWrite list for multi-step work. Run independent parts in parallel when possible.
+Simple questions, quick answers and small edits you can do yourself in the main thread. Keep a TodoWrite list for multi-step work and give each item an activeForm in plain words (the Pixel Office whiteboard shows it to the user). Run independent parts in parallel when possible.
 <!-- /pixel-office:team -->
 PIXEL_OFFICE_EOF
     } >>CLAUDE.md

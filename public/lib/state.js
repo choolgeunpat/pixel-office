@@ -1,52 +1,26 @@
 /**
  * Office state for one session, built by replaying its events in order.
- * Pure (no DOM): the scene and the side panels both read from it.
+ * Pure (no DOM): the scene, the overlay and the side panel all read from it.
  *
- * Desk phases: off (nobody there yet) → think ⇄ tool → done | error → idle.
- * Time-based looks (happy for a few seconds, asleep when idle) are derived in
+ * Desk phases: off (nobody there yet) → think ⇄ tool → done | error | wait → idle.
+ * Time-based looks (happy for a few seconds, coffee break, asleep) are derived in
  * `deskLook(desk, now)` so a replayed session looks right without timers.
  */
-import { ALL_DESKS, roleFor } from "./roles.js";
+import { ALL_DESKS, deskByKey, roleFor } from "./roles.js";
 import { DELEGATE_TOOLS } from "./normalize.js";
-
-export const TOOL_LABEL = {
-  Read: "읽는 중",
-  Write: "작성 중",
-  Edit: "수정 중",
-  MultiEdit: "수정 중",
-  NotebookEdit: "노트북 수정",
-  Bash: "실행 중",
-  Grep: "검색 중",
-  Glob: "파일 찾는 중",
-  WebFetch: "웹 보는 중",
-  WebSearch: "조사 중",
-  Task: "업무 위임",
-  Agent: "업무 위임",
-  TodoWrite: "계획 정리",
-  Skill: "스킬 사용",
-};
-export const toolLabel = (t) => TOOL_LABEL[t] || (t && t.startsWith("mcp__") ? "연동 도구" : t || "작업 중");
-
-export const TOOL_ICON = {
-  Read: "📖",
-  Write: "📝",
-  Edit: "✏️",
-  MultiEdit: "✏️",
-  Bash: "💻",
-  Grep: "🔍",
-  Glob: "🗂️",
-  WebFetch: "🌐",
-  WebSearch: "🔎",
-  Task: "📨",
-  Agent: "📨",
-  TodoWrite: "📋",
-};
+import { action, STATUS } from "./plain.js";
 
 const DONE_MS = 5000;
 const ERROR_MS = 3500;
-const SLEEP_MS = 60_000;
+const BREAK_MS = 20_000;
+const SLEEP_MS = 80_000;
 const STALE_MS = 150_000;
-const LEAVE_MS = 240_000;
+const LEAVE_MS = 300_000;
+
+/** coins earned: a finished request, a finished teammate, a checked-off to-do */
+export const REWARD = { ticket: 10, qa: 5, teammate: 5, todo: 2 };
+
+export const teamName = (key) => (key === "lead" ? "팀장" : `${deskByKey[key].name}팀`);
 
 function newDesk(key) {
   return {
@@ -54,14 +28,15 @@ function newDesk(key) {
     phase: "off",
     since: 0,
     lastTs: 0,
-    arrivedTs: 0,
-    task: "",
-    tool: null,
-    target: "",
+    act: null, // current tool action (plain wording)
+    task: "", // what the lead handed over
+    last: "", // last result this desk reported
     toolCount: 0,
     errors: 0,
+    pending: 0,
     agents: new Set(),
-    bubble: null, // { text, ts, kind }
+    bubble: null, // { text, ts, kind } — short-lived speech bubble
+    left: false,
   };
 }
 
@@ -73,7 +48,12 @@ export function createOffice(session = null) {
     remote: null,
     desks,
     todos: [],
+    todoDone: 0,
     request: "",
+    tickets: [], // one per request: { id, title, startTs, endTs, status: doing|done|failed, tools, teams:Set }
+    feed: [], // plain-language "what just happened", newest last
+    rewards: [], // { ts, amount, desk, why }
+    earned: 0,
     stats: { tools: 0, delegations: 0, errors: 0, startTs: 0, lastTs: 0 },
     agentDesk: new Map(), // agent_id → desk key
     ended: false,
@@ -81,10 +61,7 @@ export function createOffice(session = null) {
 }
 
 function arrive(desk, ts) {
-  if (desk.phase === "off" || desk.left) {
-    desk.arrivedTs = ts;
-    desk.left = false;
-  }
+  if (desk.phase === "off") desk.arrivedTs = ts;
 }
 
 function setPhase(desk, phase, ts) {
@@ -97,11 +74,33 @@ function say(desk, text, ts, kind = "info") {
   if (text) desk.bubble = { text, ts, kind };
 }
 
+function note(o, key, icon, text, ts) {
+  const last = o.feed[o.feed.length - 1];
+  if (last && last.desk === key && last.text === text) return;
+  o.feed.push({ ts, desk: key, icon, text });
+  if (o.feed.length > 80) o.feed.splice(0, o.feed.length - 80);
+}
+
+function reward(o, amount, desk, ts, why) {
+  o.rewards.push({ ts, amount, desk, why });
+  o.earned += amount;
+}
+
 function deskOf(o, ev) {
   if (ev.agentId && o.agentDesk.has(ev.agentId)) return o.desks[o.agentDesk.get(ev.agentId)];
   const key = roleFor(ev.agentType);
   if (ev.agentId && ev.agentType) o.agentDesk.set(ev.agentId, key);
   return o.desks[key];
+}
+
+const currentTicket = (o) => o.tickets[o.tickets.length - 1];
+
+function closeTicket(o, status, ts) {
+  const t = currentTicket(o);
+  if (!t || t.status !== "doing") return null;
+  t.status = status;
+  t.endTs = ts;
+  return t;
 }
 
 /** Apply one normalized event (see normalize.js). Mutates and returns `o`. */
@@ -121,33 +120,50 @@ export function apply(o, ev) {
   switch (ev.kind) {
     case "session_start":
       o.ended = false;
-      say(lead, "출근 완료! ☕", ts);
+      say(lead, "좋은 아침이에요! ☕", ts);
+      note(o, "lead", "☀️", "팀장이 출근했어요", ts);
       break;
-    case "prompt":
+    case "prompt": {
       o.request = ev.text;
       o.ended = false;
+      closeTicket(o, "done", ts);
+      o.tickets.push({ id: o.tickets.length + 1, title: ev.text, startTs: ts, endTs: 0, status: "doing", tools: 0, teams: new Set() });
+      if (o.tickets.length > 30) o.tickets.shift();
       setPhase(lead, "think", ts);
-      say(lead, ev.text, ts, "prompt");
+      lead.act = null;
+      say(lead, ev.text, ts, "request");
+      note(o, "lead", "💬", `새 의뢰가 들어왔어요: ${ev.text}`, ts);
       break;
+    }
     case "tool_start": {
       arrive(desk, ts);
       setPhase(desk, "tool", ts);
-      desk.tool = ev.tool;
-      desk.target = ev.target;
+      desk.act = { ...action(ev.tool, ev.target, ev.cmdKind), tool: ev.tool };
       desk.toolCount++;
       o.stats.tools++;
-      if (ev.todos) o.todos = ev.todos;
+      const tk = currentTicket(o);
+      if (tk && tk.status === "doing") {
+        tk.tools++;
+        tk.teams.add(desk.key);
+      }
+      if (ev.todos) {
+        o.todos = ev.todos;
+        const done = ev.todos.filter((t) => t.status === "completed").length;
+        if (done > o.todoDone) reward(o, (done - o.todoDone) * REWARD.todo, desk.key, ts, "todo");
+        o.todoDone = done;
+      }
       if (ev.delegate) {
         const to = o.desks[roleFor(ev.delegate.type)];
         arrive(to, ts);
         setPhase(to, "think", ts);
         to.task = ev.delegate.description;
-        to.pending = (to.pending || 0) + 1;
+        to.pending++;
         say(to, ev.delegate.description, ts, "task");
         o.stats.delegations++;
-        say(desk, `→ ${ALL_DESKS.find((d) => d.key === to.key).name}팀: ${ev.delegate.description}`, ts, "delegate");
-      } else {
-        say(desk, `${TOOL_ICON[ev.tool] || "🛠️"} ${ev.target || toolLabel(ev.tool)}`, ts, "tool");
+        desk.act = { ...desk.act, detail: `${teamName(to.key)} · ${ev.delegate.description}` };
+        note(o, desk.key, "📨", `${teamName(desk.key)}이 ${teamName(to.key)}에 일을 맡겼어요: ${ev.delegate.description}`, ts);
+      } else if (ev.tool !== "TodoWrite") {
+        note(o, desk.key, desk.act.icon, `${teamName(desk.key)} · ${desk.act.long}${desk.act.detail ? ` (${desk.act.detail})` : ""}`, ts);
       }
       break;
     }
@@ -156,7 +172,8 @@ export function apply(o, ev) {
         desk.errors++;
         o.stats.errors++;
         setPhase(desk, "error", ts);
-        say(desk, ev.text ? `앗, 실패: ${ev.text}` : "앗, 다시 해볼게요", ts, "error");
+        say(desk, "앗, 잘 안 됐어요. 다시 해볼게요", ts, "error");
+        note(o, desk.key, "😵", `${teamName(desk.key)}에서 문제가 생겨서 다시 시도해요`, ts);
       } else if (desk.phase === "tool") {
         setPhase(desk, "think", ts);
       } else {
@@ -176,28 +193,43 @@ export function apply(o, ev) {
       arrive(desk, ts);
       desk.agents.add(ev.agentId || "?");
       setPhase(desk, "think", ts);
+      note(o, desk.key, "🚪", `${teamName(desk.key)}이 일을 시작했어요`, ts);
       break;
     case "subagent_stop":
       desk.agents.delete(ev.agentId || "?");
       if (desk.pending > 0) desk.pending--;
       if (!desk.agents.size) setPhase(desk, "done", ts);
-      say(desk, ev.text || "완료했습니다! ✅", ts, "done");
+      desk.last = ev.text || "";
+      desk.task = "";
+      say(desk, ev.text || "다 끝냈어요! ✅", ts, "done");
+      reward(o, REWARD.teammate, desk.key, ts, "teammate");
+      note(o, desk.key, "✅", `${teamName(desk.key)}이 일을 마쳤어요${ev.text ? `: ${ev.text}` : ""}`, ts);
       break;
-    case "stop":
-      setPhase(lead, ev.ok === false ? "error" : "done", ts);
-      say(lead, ev.ok === false ? "문제가 생겼어요" : ev.text || "요청 처리 완료!", ts, ev.ok === false ? "error" : "done");
+    case "stop": {
+      const failed = ev.ok === false;
+      setPhase(lead, failed ? "error" : "done", ts);
+      lead.act = null;
+      lead.last = ev.text || "";
+      const t = closeTicket(o, failed ? "failed" : "done", ts);
+      say(lead, failed ? "문제가 생겼어요" : ev.text || "의뢰를 끝냈어요!", ts, failed ? "error" : "done");
+      if (t && !failed) reward(o, t.tools > 0 ? REWARD.ticket : REWARD.qa, "lead", ts, "ticket");
+      note(o, "lead", failed ? "⚠️" : "🎉", failed ? "의뢰 처리 중 문제가 생겼어요" : "의뢰를 끝냈어요", ts);
       break;
+    }
     case "notify":
       setPhase(lead, "wait", ts);
-      say(lead, `🔔 ${ev.text || "확인이 필요해요"}`, ts, "notify");
+      say(lead, ev.text || "확인이 필요해요", ts, "notify");
+      note(o, "lead", "✋", `대표님 확인이 필요해요${ev.text ? `: ${ev.text}` : ""}`, ts);
       break;
     case "compact":
-      say(lead, "🧹 메모 정리 중…", ts);
+      say(lead, "메모를 정리하는 중이에요 🧹", ts);
       break;
     case "session_end":
       o.ended = true;
       for (const d of Object.values(o.desks)) if (d.phase !== "off") setPhase(d, "idle", ts);
+      closeTicket(o, "done", ts);
       say(lead, "오늘 업무 끝! 👋", ts);
+      note(o, "lead", "👋", "오늘 업무를 마쳤어요", ts);
       break;
   }
   return o;
@@ -205,12 +237,14 @@ export function apply(o, ev) {
 
 /**
  * What a desk looks like at `now`:
- *  - anim: sprite motion (sit | interact | happy | sad | sleep | idle)
- *  - status: short label for panels
- *  - present: character is at the desk (false → walks out / empty desk)
+ *  anim     sprite motion (sit | interact | happy | sad | sleep | idle)
+ *  status   short label for chips ("자료 읽는 중")
+ *  tone     busy | done | error | wait | idle | coffee | off
+ *  present  the character is in the office (false → walked out / empty desk)
+ *  coffee   the character is at the coffee machine
  */
 export function deskLook(d, now, ended = false) {
-  if (d.phase === "off") return { anim: null, status: "출근 전", tone: "off", present: false };
+  if (d.phase === "off") return { anim: null, status: STATUS.off, tone: "off", present: false, coffee: false };
   const age = now - d.since;
   const quiet = now - d.lastTs;
   let phase = d.phase;
@@ -219,20 +253,54 @@ export function deskLook(d, now, ended = false) {
   if ((phase === "think" || phase === "tool") && quiet > STALE_MS) phase = "idle";
   if (phase === "wait" && quiet > STALE_MS) phase = "idle";
   const present = d.key === "lead" ? !ended || quiet < 20_000 : !(phase === "idle" && quiet > LEAVE_MS);
+  const mk = (anim, status, tone, coffee = false) => ({ anim, status, tone, present, coffee });
   switch (phase) {
     case "tool":
-      return { anim: "interact", status: toolLabel(d.tool), tone: "busy", present };
+      return mk("interact", (d.act && d.act.short) || "작업 중", "busy");
     case "think":
-      return { anim: "sit", status: d.key === "lead" ? "생각 중" : "업무 파악 중", tone: "busy", present };
+      return mk("sit", d.key === "lead" ? STATUS.think : STATUS.thinkWorker, "busy");
     case "wait":
-      return { anim: "idle", status: "승인 대기", tone: "wait", present };
+      return mk("idle", STATUS.wait, "wait");
     case "done":
-      return { anim: "happy", status: "완료!", tone: "done", present };
+      return mk("happy", STATUS.done, "done");
     case "error":
-      return { anim: "sad", status: "오류", tone: "error", present };
+      return mk("sad", STATUS.error, "error");
     default:
-      return quiet > SLEEP_MS ? { anim: "sleep", status: "휴식 중", tone: "idle", present } : { anim: "sit", status: "대기", tone: "idle", present };
+      if (quiet < BREAK_MS) return mk("sit", STATUS.idle, "idle");
+      if (quiet < SLEEP_MS) return mk("idle", STATUS.coffee, "coffee", true);
+      return mk("sleep", STATUS.sleep, "idle");
   }
+}
+
+/** The second line of a desk card: what exactly they are working on. */
+export function deskDetail(o, d, look) {
+  if (look.tone === "off") return "";
+  if (look.tone === "busy") {
+    if (d.act && d.act.detail && look.anim === "interact") return d.act.detail;
+    if (d.key === "lead") return o.request;
+    return d.task;
+  }
+  if (look.tone === "wait") return "";
+  if (look.tone === "done" || look.tone === "idle" || look.tone === "coffee") return d.last;
+  return "";
+}
+
+/** One sentence for the "right now" strip. */
+export function headline(o, now) {
+  if (!o || !o.stats.startTs) return { text: "출근 대기 중 · 일을 맡겨 보세요", tone: "idle", busy: 0 };
+  const looks = ALL_DESKS.map((x) => ({ d: o.desks[x.key], look: deskLook(o.desks[x.key], now, o.ended) }));
+  if (looks.find((x) => x.d.key === "lead" && x.look.tone === "wait")) return { text: "대표님, 확인이 필요해요 ✋", tone: "wait", busy: 0 };
+  const busy = looks.filter((x) => x.look.tone === "busy");
+  if (busy.length) {
+    const first = busy
+      .slice(0, 2)
+      .map((x) => `${teamName(x.d.key)} ${x.look.status}`)
+      .join(" · ");
+    return { text: `${first}${busy.length > 2 ? ` 외 ${busy.length - 2}명` : ""}`, tone: "busy", busy: busy.length };
+  }
+  if (looks.some((x) => x.look.tone === "error")) return { text: "잠깐 문제가 있었어요, 다시 해보는 중", tone: "error", busy: 0 };
+  if (looks.some((x) => x.look.tone === "coffee")) return { text: "☕ 잠깐 커피 타임이에요", tone: "idle", busy: 0 };
+  return { text: "지금은 모두 쉬는 중이에요", tone: "idle", busy: 0 };
 }
 
 /** Sessions seen in an event list, newest activity first. */

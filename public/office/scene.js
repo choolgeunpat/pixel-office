@@ -1,32 +1,36 @@
 /**
- * The office scene: static background (cached), then every frame the desks,
- * characters, walkers, wall displays and speech bubbles, depth-sorted by y.
+ * The office scene (canvas): static background cached per time of day / company level,
+ * then every frame the desks, characters, walkers, coffee breaks and confetti, depth-sorted by y.
+ * All TEXT (name plates, status cards, speech bubbles, whiteboard, TV) is HTML — see overlay.js —
+ * so it stays sharp and readable at any size.
  */
-import { ROLES, LEAD, deskByKey } from "../lib/roles.js";
-import { deskLook, toolLabel } from "../lib/state.js";
+import { ROLES, LEAD } from "../lib/roles.js";
 import { Character } from "./sprites.js";
 import { PAL, R, box, disc, ellipse, rng, monstera, snakePlant, pothos, pot, deskGeom, chair, desk, screenFor, mug } from "./art.js";
 
 export const W = 880;
-export const H = 560;
+export const H = 600;
 const WALL = 168;
-const FONT = "12px Galmuri11, monospace";
-const FONT_B = "12px 'Galmuri11 Bold', Galmuri11, monospace";
-const DOOR = { x: 44, y: 190 };
-const WALK_SPEED = 0.11; // px per ms
+const FONT_B = "bold 11px 'Galmuri11 Bold', monospace";
+export const DOOR = { x: 44, y: 190 };
+const WALK_SPEED = 0.11; // world px per ms
+export const ORDER = ["lead", "plan", "dev", "test", "mkt", "design", "review"];
+export const coffeeSpot = (key) => ({ x: 100 + ORDER.indexOf(key) * 22, y: 188 });
+export const BOARD = { x: 446, y: 16, w: 180, h: 98 };
+export const TV = { x: 724, y: 30, w: 140, h: 78 };
 
 /** desk positions: two rows of three + the lead's glass office */
 export const LAYOUT = {
-  plan: deskGeom(162, 304),
-  dev: deskGeom(342, 304),
-  test: deskGeom(522, 304),
-  mkt: deskGeom(162, 458),
-  design: deskGeom(342, 458),
-  review: deskGeom(522, 458),
-  lead: deskGeom(762, 326, 172),
+  plan: deskGeom(162, 290),
+  dev: deskGeom(342, 290),
+  test: deskGeom(522, 290),
+  mkt: deskGeom(162, 496),
+  design: deskGeom(342, 496),
+  review: deskGeom(522, 496),
+  lead: deskGeom(762, 340, 172),
 };
 
-function skyMode(date) {
+export function skyMode(date) {
   const h = date.getHours() + date.getMinutes() / 60;
   if (h >= 7 && h < 17) return "day";
   if ((h >= 17 && h < 19.5) || (h >= 5 && h < 7)) return "sunset";
@@ -39,7 +43,7 @@ const SKY = {
   night: { top: "#1c2a4f", bottom: "#4a4f86", b1: "#33406a", b2: "#26304f", win: "#ffd77a", lit: 0.55 },
 };
 
-function drawBackground(ctx, mode) {
+function drawBackground(ctx, mode, level) {
   const sky = SKY[mode];
   // wall
   R(ctx, 0, 0, W, WALL, PAL.wall);
@@ -68,9 +72,9 @@ function drawBackground(ctx, mode) {
 
   // sage rug under the team area
   const rx = 66;
-  const ry = 200;
+  const ry = 186;
   const rw = 552;
-  const rh = 296;
+  const rh = 372;
   R(ctx, rx + 4, ry + 4, rw, rh, "rgba(60,40,20,0.1)");
   box(ctx, rx, ry, rw, rh, PAL.sage, PAL.sageDark, 2);
   R(ctx, rx + 8, ry + 8, rw - 16, 2, PAL.sageLight);
@@ -195,9 +199,80 @@ function drawBackground(ctx, mode) {
   pothos(ctx, 620, 30, 36);
 
   // ---------------- lounge (bottom right)
-  ellipse(ctx, 764, 490, 104, 46, "#e7cdb4");
-  ellipse(ctx, 764, 490, 96, 41, "#f0dcc6");
-  for (let i = 0; i < 3; i++) ellipse(ctx, 764, 490, 84 - i * 24, 34 - i * 10, i % 2 ? "#f0dcc6" : "#e9d1b9");
+  ellipse(ctx, 764, 524, 104, 46, "#e7cdb4");
+  ellipse(ctx, 764, 524, 96, 41, "#f0dcc6");
+  for (let i = 0; i < 3; i++) ellipse(ctx, 764, 524, 84 - i * 24, 34 - i * 10, i % 2 ? "#f0dcc6" : "#e9d1b9");
+
+  // ---------------- whiteboard + TV frames (their text is HTML, see overlay.js)
+  box(ctx, BOARD.x, BOARD.y, BOARD.w, BOARD.h, PAL.white, "#9aa0ab");
+  R(ctx, BOARD.x + 2, BOARD.y + BOARD.h - 2, BOARD.w - 4, 4, "#c6cbd3");
+  R(ctx, BOARD.x + 20, BOARD.y + BOARD.h + 1, 10, 3, PAL.terracotta);
+  R(ctx, BOARD.x + 34, BOARD.y + BOARD.h + 1, 10, 3, "#5b8def");
+  R(ctx, BOARD.x + 48, BOARD.y + BOARD.h + 1, 10, 3, "#3fae6a");
+  box(ctx, TV.x - 3, TV.y - 3, TV.w + 6, TV.h + 6, PAL.metal);
+  R(ctx, TV.x, TV.y, TV.w, TV.h, "#10162a");
+  R(ctx, TV.x + 1, TV.y + 1, TV.w - 2, 1, "rgba(255,255,255,0.12)");
+
+  // ---------------- signboard over the coffee bar
+  box(ctx, 92, 18, 116, 24, PAL.ink, PAL.ink, 2);
+  R(ctx, 100, 30, 3, 6, PAL.white);
+  R(ctx, 104, 25, 3, 11, PAL.white);
+  R(ctx, 108, 28, 3, 8, PAL.white);
+  ctx.font = FONT_B;
+  ctx.textBaseline = "top";
+  ctx.fillStyle = PAL.white;
+  ctx.fillText("PIXEL OFFICE", 116, 24);
+  R(ctx, 120, 11, 1, 7, PAL.metal);
+  R(ctx, 180, 11, 1, 7, PAL.metal);
+
+  drawDecor(ctx, level);
+}
+
+/** The office grows with the company: each level adds something to look at. */
+function drawDecor(ctx, level) {
+  if (level >= 2) {
+    // trophy on the bookshelf
+    R(ctx, 664, 24, 12, 3, PAL.goldDark);
+    R(ctx, 665, 27, 10, 5, PAL.gold);
+    R(ctx, 668, 32, 4, 2, PAL.goldDark);
+    R(ctx, 664, 34, 12, 1, PAL.ink);
+  }
+  if (level >= 3) {
+    // framed certificates on the wainscot
+    [244, 288, 332].forEach((x, i) => {
+      box(ctx, x, 130, 32, 26, PAL.white, PAL.ink);
+      R(ctx, x + 4, 134, 24, 3, i === 1 ? PAL.terracotta : PAL.sage);
+      for (let k = 0; k < 3; k++) R(ctx, x + 4, 140 + k * 4, 18 + ((k * 5) % 6), 1, "#b8bdc9");
+      disc(ctx, x + 25, 149, 2, PAL.gold);
+    });
+  }
+  if (level >= 4) {
+    // hanging lamps over the team rug
+    [162, 342, 522].forEach((x) => {
+      R(ctx, x, 168, 1, 12, PAL.metal);
+      ellipse(ctx, x, 184, 12, 5, PAL.gold);
+      R(ctx, x - 12, 184, 24, 1, PAL.goldDark);
+      ctx.fillStyle = "rgba(255,226,150,0.13)";
+      ctx.fillRect(x - 10, 189, 20, 4);
+    });
+  }
+  if (level >= 5) {
+    // executive carpet under the lead's desk
+    R(ctx, 680, 262, 164, 130, "rgba(60,40,20,0.1)");
+    box(ctx, 676, 258, 164, 130, "#b9473f", "#7c2a28", 2);
+    R(ctx, 684, 266, 148, 2, "#e07a6e");
+    R(ctx, 684, 376, 148, 2, "#e07a6e");
+    for (let x = 688; x < 828; x += 14) R(ctx, x, 270, 6, 1, "#e9c27a");
+  }
+  if (level >= 6) {
+    // golden unicorn statue
+    R(ctx, 588, 548, 28, 10, PAL.metal);
+    R(ctx, 592, 530, 20, 18, PAL.gold);
+    R(ctx, 606, 522, 8, 10, PAL.gold);
+    R(ctx, 612, 514, 2, 8, "#fff3c4");
+    R(ctx, 596, 534, 4, 4, PAL.goldDark);
+    R(ctx, 592, 546, 20, 2, PAL.goldDark);
+  }
 }
 
 function cloud(ctx, x, y) {
@@ -215,30 +290,61 @@ function mix(a, b, t) {
 
 // ------------------------------------------------------------------ text helpers
 
-function wrap(ctx, text, maxW, maxLines) {
-  const out = [];
-  let line = "";
-  for (const ch of [...text]) {
-    if (ctx.measureText(line + ch).width > maxW) {
-      out.push(line);
-      line = ch.trim() ? ch : "";
-      if (out.length === maxLines) break;
-    } else line += ch;
-  }
-  if (out.length < maxLines && line) out.push(line);
-  if (out.length === maxLines && [...out.join("")].length < [...text].length) {
-    let l = out[maxLines - 1];
-    while (l && ctx.measureText(l + "…").width > maxW) l = l.slice(0, -1);
-    out[maxLines - 1] = l + "…";
+// ------------------------------------------------------------------ walking
+
+/** the points a character passes between two places (hub = the door) */
+function pointsFor(loc, key) {
+  const g = LAYOUT[key];
+  if (loc === "away") return [DOOR];
+  // walk along the back of the desks: high enough that legs and shoes are not hidden by the desk top
+  if (loc === "seat") return [DOOR, { x: DOOR.x, y: g.seatY - 36 }, { x: g.seatX, y: g.seatY }];
+  return [DOOR, coffeeSpot(key)];
+}
+
+function route(from, to, key) {
+  return pointsFor(from, key).slice().reverse().concat(pointsFor(to, key).slice(1));
+}
+
+const dist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+
+function lengthOf(pts) {
+  let len = 0;
+  for (let i = 1; i < pts.length; i++) len += dist(pts[i - 1], pts[i]);
+  return len;
+}
+
+/** the polyline up to distance d from its start */
+function prefixTo(pts, d) {
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const seg = dist(pts[i - 1], pts[i]);
+    if (d >= seg) {
+      out.push(pts[i]);
+      d -= seg;
+    } else {
+      const u = seg ? d / seg : 0;
+      out.push({ x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * u, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * u });
+      break;
+    }
   }
   return out;
 }
 
-function fit(ctx, text, maxW) {
-  if (ctx.measureText(text).width <= maxW) return text;
-  let t = text;
-  while (t && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
-  return t + "…";
+function posOf(w, now) {
+  let d = Math.max(0, Math.min(w.len, (now - w.t0) * WALK_SPEED));
+  for (let i = 1; i < w.pts.length; i++) {
+    const p = w.pts[i - 1];
+    const q = w.pts[i];
+    const seg = dist(p, q);
+    if (d <= seg || i === w.pts.length - 1) {
+      const u = seg ? Math.min(1, d / seg) : 1;
+      const dir = Math.abs(q.x - p.x) >= Math.abs(q.y - p.y) ? (q.x >= p.x ? "right" : "left") : q.y > p.y ? "front" : "back";
+      return { x: p.x + (q.x - p.x) * u, y: p.y + (q.y - p.y) * u, dir, done: now - w.t0 >= w.dur };
+    }
+    d -= seg;
+  }
+  const last = w.pts[w.pts.length - 1];
+  return { x: last.x, y: last.y, dir: "front", done: true };
 }
 
 // ------------------------------------------------------------------ scene
@@ -246,136 +352,146 @@ function fit(ctx, text, maxW) {
 export class OfficeScene {
   constructor(canvas) {
     this.canvas = canvas;
-    canvas.width = W;
-    canvas.height = H;
     this.ctx = canvas.getContext("2d");
-    this.ctx.imageSmoothingEnabled = false;
     this.bg = document.createElement("canvas");
-    this.bg.width = W;
-    this.bg.height = H;
-    this.mode = null;
+    this.S = 1;
+    this.bgKey = null;
+    this.level = 1;
     this.chars = {};
     for (const d of [LEAD, ...ROLES]) this.chars[d.key] = new Character(d.look);
-    this.actors = {}; // desk key → { state: away|walking|seated, path, t0, dur }
+    this.actors = {};
     this.planes = [];
+    this.parts = [];
     this.seenTasks = new Map();
     this.office = null;
-    this.hover = null;
+    this.instant = true;
+    this.frame = { looks: {}, actors: {} };
+    this.lastT = 0;
+    this.resize(1);
   }
 
-  setOffice(office, { instant = false } = {}) {
-    if (office !== this.office) {
-      this.office = office;
-      this.actors = {};
-      this.seenTasks = new Map();
-      this.instant = true;
+  /** @param scale  device pixels per world pixel (css scale × devicePixelRatio) */
+  resize(scale) {
+    const S = Math.max(1, Math.min(4, Math.ceil(scale)));
+    this.S = S;
+    this.canvas.width = this.bg.width = W * S;
+    this.canvas.height = this.bg.height = H * S;
+    this.bgKey = null;
+  }
+
+  setOffice(office) {
+    if (office === this.office) return;
+    this.office = office;
+    this.actors = {};
+    this.seenTasks = new Map();
+    this.planes = [];
+    this.instant = true;
+  }
+
+  setLevel(level) {
+    this.level = level;
+  }
+
+  /** confetti from a world point */
+  burst(x, y, n = 28) {
+    const colors = ["#f2c14e", "#ef9a7a", "#7cc77a", "#7fb0ff", "#ff8fb1", "#ffffff"];
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const v = 0.06 + Math.random() * 0.16;
+      this.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.12, life: 900 + Math.random() * 700, age: 0, c: colors[i % colors.length] });
     }
-    if (instant) this.instant = true;
   }
 
   ensureBackground(now) {
-    const mode = skyMode(new Date(now));
-    if (mode === this.mode) return;
-    this.mode = mode;
+    const key = `${skyMode(new Date(now))}|${this.level}`;
+    if (key === this.bgKey) return;
+    this.bgKey = key;
     const b = this.bg.getContext("2d");
+    b.setTransform(this.S, 0, 0, this.S, 0, 0);
     b.imageSmoothingEnabled = false;
-    drawBackground(b, mode);
+    drawBackground(b, skyMode(new Date(now)), this.level);
   }
 
-  /** where each desk's character is right now (handles walking in and out) */
+  /** where each character is right now; walks in, goes for coffee, walks out */
   actor(key, look, now) {
-    const g = LAYOUT[key];
-    const seat = { x: g.seatX, y: g.seatY };
+    const desired = !look.present ? "away" : look.coffee ? "coffee" : "seat";
     let a = this.actors[key];
-    const want = look.present;
-    if (!a) {
-      a = this.actors[key] = { state: want ? "seated" : "away" };
-      if (want && !this.instant) this.startWalk(a, key, true, now);
-    } else if (want && (a.state === "away" || (a.state === "walking" && !a.inbound))) {
-      this.startWalk(a, key, true, now, a.state === "walking" ? this.posOf(a, now) : null);
-    } else if (!want && (a.state === "seated" || (a.state === "walking" && a.inbound))) {
-      this.startWalk(a, key, false, now, a.state === "walking" ? this.posOf(a, now) : null);
-    }
-    if (a.state === "walking") {
-      const p = this.posOf(a, now);
-      if (p.done) {
-        a.state = a.inbound ? "seated" : "away";
-      } else return { x: p.x, y: p.y, walking: true, dir: p.dir };
-    }
-    return a.state === "seated" ? { ...seat, walking: false } : null;
-  }
-
-  startWalk(a, key, inbound, now, from = null) {
-    const g = LAYOUT[key];
-    const seat = { x: g.seatX, y: g.seatY };
-    // path: door → down the left aisle → along the row (behind the desks) → seat
-    const pts = inbound ? [from || DOOR, { x: DOOR.x, y: seat.y }, seat] : [from || seat, { x: DOOR.x, y: seat.y }, DOOR];
-    if (from) pts.splice(1, 1, inbound ? { x: from.x, y: seat.y } : { x: DOOR.x, y: from.y });
-    let len = 0;
-    for (let i = 1; i < pts.length; i++) len += Math.abs(pts[i].x - pts[i - 1].x) + Math.abs(pts[i].y - pts[i - 1].y);
-    Object.assign(a, { state: "walking", inbound, pts, t0: now, dur: Math.max(1, len / WALK_SPEED), len });
-  }
-
-  posOf(a, now) {
-    const k = Math.min(1, (now - a.t0) / a.dur);
-    let d = k * a.len;
-    for (let i = 1; i < a.pts.length; i++) {
-      const p = a.pts[i - 1];
-      const q = a.pts[i];
-      const seg = Math.abs(q.x - p.x) + Math.abs(q.y - p.y);
-      if (d <= seg || i === a.pts.length - 1) {
-        const u = seg ? Math.min(1, d / seg) : 1;
-        const dir = q.x > p.x ? "right" : q.x < p.x ? "left" : q.y > p.y ? "front" : "back";
-        return { x: p.x + (q.x - p.x) * u, y: p.y + (q.y - p.y) * u, dir, done: k >= 1 };
+    if (!a) a = this.actors[key] = { loc: this.instant ? desired : "away", walk: null };
+    if (a.walk && a.walk.to !== desired) {
+      // changed their mind mid-way: turn around and go back the way they came
+      const w = a.walk;
+      const back = prefixTo(w.pts, Math.min(w.len, (now - w.t0) * WALK_SPEED)).reverse();
+      const pts = desired === w.from ? back : back.concat(route(w.from, desired, key).slice(1));
+      const len = lengthOf(pts);
+      a.walk = { pts, t0: now, len, dur: Math.max(1, len / WALK_SPEED), from: w.from, to: desired };
+    } else if (!a.walk && a.loc !== desired) {
+      if (this.instant) a.loc = desired;
+      else {
+        const pts = route(a.loc, desired, key);
+        const len = lengthOf(pts);
+        a.walk = { pts, t0: now, len, dur: Math.max(1, len / WALK_SPEED), from: a.loc, to: desired };
       }
-      d -= seg;
     }
-    return { ...a.pts[a.pts.length - 1], dir: "front", done: true };
+    if (a.walk) {
+      const p = posOf(a.walk, now);
+      if (!p.done) return { loc: "walking", x: p.x, y: p.y, dir: p.dir };
+      a.loc = a.walk.to;
+      a.walk = null;
+    }
+    if (a.loc === "away") return null;
+    if (a.loc === "coffee") return { loc: "coffee", ...coffeeSpot(key) };
+    const g = LAYOUT[key];
+    return { loc: "seat", x: g.seatX, y: g.seatY };
   }
 
-  render(now) {
+  render(now, looks) {
     const ctx = this.ctx;
+    const S = this.S;
     this.ensureBackground(now);
-    ctx.drawImage(this.bg, 0, 0);
+    ctx.setTransform(S, 0, 0, S, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this.bg, 0, 0, W, H);
     const o = this.office;
     const t = now;
-    this.drawWall(ctx, o, now);
+    this.drawDynamic(ctx, now);
 
     const items = [];
-    const looks = {};
+    const actors = {};
     for (const d of [LEAD, ...ROLES]) {
-      const desk_ = o ? o.desks[d.key] : null;
-      const look = desk_ ? deskLook(desk_, now, o.ended) : { anim: null, tone: "off", present: false, status: "출근 전" };
-      looks[d.key] = look;
+      const look = looks[d.key];
       const g = LAYOUT[d.key];
       const pos = this.actor(d.key, look, now);
-      const seated = pos && !pos.walking;
+      actors[d.key] = pos;
+      const seated = !!pos && pos.loc === "seat";
+      const ch = this.chars[d.key];
       items.push({ y: g.seatY - 1, draw: () => chair(ctx, g.cx, g.gy, d.color, !seated) });
-      if (pos) {
-        const ch = this.chars[d.key];
-        if (pos.walking) items.push({ y: pos.y, draw: () => ch.draw(ctx, "walk", pos.dir, pos.x, pos.y, t) });
-        else {
-          // the sit/sleep frames sit lower in the frame; lift them so the shoulders clear the desk
-          const anim = look.anim || "sit";
-          const lift = anim === "sit" || anim === "sleep" ? 8 : 0;
-          items.push({ y: g.seatY, draw: () => ch.draw(ctx, anim, "front", pos.x, pos.y - lift, t + d.key.length * 333) });
-        }
+      if (pos && pos.loc === "walking") items.push({ y: pos.y, draw: () => ch.draw(ctx, "walk", pos.dir, pos.x, pos.y, t) });
+      else if (pos && pos.loc === "coffee")
+        items.push({
+          y: pos.y,
+          draw: () => {
+            ch.draw(ctx, "idle", "back", pos.x, pos.y, t);
+            mug(ctx, pos.x + 9, pos.y - 46, PAL.white, t, true);
+          },
+        });
+      else if (seated) {
+        // the sit/sleep frames sit lower in the frame; lift them so the shoulders clear the desk
+        const anim = look.anim || "sit";
+        const lift = anim === "sit" || anim === "sleep" ? 8 : 0;
+        items.push({ y: g.seatY, draw: () => ch.draw(ctx, anim, "front", pos.x, pos.y - lift, t + d.key.length * 333) });
       }
       const busy = look.tone === "busy";
       items.push({
         y: g.gy,
-        draw: () => {
+        draw: () =>
           desk(ctx, g, {
             color: d.color,
             t,
             busy,
             wide: d.key === "lead",
             accessories: ROLES.indexOf(d),
-            screen: screenFor(ctx, seated ? look : null, desk_?.tool, d.color, t, d.key.charCodeAt(0) + d.key.length),
-            label: (x, y) => this.namePlate(ctx, d, x, y),
-          });
-          this.statusPill(ctx, d, look, g);
-        },
+            screen: screenFor(ctx, seated ? look : null, o && o.desks[d.key].act && o.desks[d.key].act.tool, d.color, t, d.key.charCodeAt(0) + d.key.length),
+          }),
       });
     }
     this.lounge(items, t);
@@ -384,32 +500,14 @@ export class OfficeScene {
     for (const it of items) it.draw();
 
     this.delegations(ctx, o, now);
-    // bubbles on top of everything
-    if (o)
-      for (const d of [LEAD, ...ROLES]) {
-        const a = this.actors[d.key];
-        if (!a || a.state !== "seated") continue;
-        this.bubble(ctx, d, o.desks[d.key], looks[d.key], now);
-      }
-    this.instant = false;
+    this.drawParticles(ctx, now);
+    this.frame = { looks, actors };
   }
 
-  drawWall(ctx, o, now) {
-    // Pixel District style signboard over the coffee bar
-    box(ctx, 92, 18, 116, 24, PAL.ink, PAL.ink, 2);
-    R(ctx, 100, 30, 3, 6, PAL.white);
-    R(ctx, 104, 25, 3, 11, PAL.white);
-    R(ctx, 108, 28, 3, 8, PAL.white);
-    ctx.font = FONT_B;
-    ctx.textBaseline = "top";
-    ctx.fillStyle = PAL.white;
-    ctx.fillText("PIXEL OFFICE", 116, 24);
-    const blink = Math.floor(now / 700) % 2;
-    disc(ctx, 203, 23, 2, blink ? PAL.gold : "#7a6a3a");
-    R(ctx, 120, 11, 1, 7, PAL.metal);
-    R(ctx, 180, 11, 1, 7, PAL.metal);
-
-    // espresso machine on the counter
+  drawDynamic(ctx, now) {
+    // sign light
+    disc(ctx, 203, 23, 2, Math.floor(now / 700) % 2 ? PAL.gold : "#7a6a3a");
+    // espresso machine + mugs on the counter
     box(ctx, 96, 84, 34, 24, "#c9ccd2", PAL.ink);
     R(ctx, 99, 87, 28, 6, "#a7abb4");
     R(ctx, 102, 95, 3, 3, PAL.terracotta);
@@ -419,175 +517,38 @@ export class OfficeScene {
     mug(ctx, 160, 100, PAL.terracotta, now, false);
     box(ctx, 176, 92, 20, 16, "#f4e7d1", PAL.oakDark);
     R(ctx, 179, 96, 14, 2, PAL.oakDark);
-
-    // clock
-    disc(ctx, 534, 58, 17, PAL.ink);
-    disc(ctx, 534, 58, 15, PAL.white);
+    // clock above the door
+    const cx = 44;
+    const cy = 26;
+    disc(ctx, cx, cy, 10, PAL.ink);
+    disc(ctx, cx, cy, 8, PAL.white);
     const d = new Date(now);
     const hand = (ang, len, w, c) => {
       ctx.strokeStyle = c;
       ctx.lineWidth = w;
       ctx.beginPath();
-      ctx.moveTo(534.5, 58.5);
-      ctx.lineTo(534.5 + Math.sin(ang) * len, 58.5 - Math.cos(ang) * len);
+      ctx.moveTo(cx + 0.5, cy + 0.5);
+      ctx.lineTo(cx + 0.5 + Math.sin(ang) * len, cy + 0.5 - Math.cos(ang) * len);
       ctx.stroke();
     };
-    for (let i = 0; i < 12; i++) R(ctx, 534 + Math.round(Math.sin((i / 6) * Math.PI) * 12), 58 - Math.round(Math.cos((i / 6) * Math.PI) * 12), 1, 1, PAL.ink);
-    hand(((d.getHours() % 12) + d.getMinutes() / 60) * (Math.PI / 6), 7, 2, PAL.ink);
-    hand(d.getMinutes() * (Math.PI / 30), 11, 1, PAL.ink);
-    hand(d.getSeconds() * (Math.PI / 30), 12, 1, PAL.terracotta);
-
-    this.whiteboard(ctx, o);
-    this.tv(ctx, o, now);
+    for (let i = 0; i < 4; i++) R(ctx, cx + Math.round(Math.sin((i / 2) * Math.PI) * 6), cy - Math.round(Math.cos((i / 2) * Math.PI) * 6), 1, 1, PAL.ink);
+    hand(((d.getHours() % 12) + d.getMinutes() / 60) * (Math.PI / 6), 4, 2, PAL.ink);
+    hand(d.getMinutes() * (Math.PI / 30), 6, 1, PAL.ink);
+    hand(d.getSeconds() * (Math.PI / 30), 7, 1, PAL.terracotta);
   }
 
-  whiteboard(ctx, o) {
-    const x = 470;
-    const y = 22;
-    const w = 156;
-    const h = 96;
-    box(ctx, x, y, w, h, PAL.white, "#9aa0ab");
-    R(ctx, x + 2, y + h - 2, w - 4, 4, "#c6cbd3");
-    R(ctx, x + 20, y + h + 1, 10, 3, PAL.terracotta);
-    R(ctx, x + 34, y + h + 1, 10, 3, "#5b8def");
-    R(ctx, x + 48, y + h + 1, 10, 3, "#3fae6a");
-    ctx.font = FONT_B;
-    ctx.textBaseline = "top";
-    ctx.fillStyle = PAL.ink;
-    ctx.fillText("📋 TO-DO", x + 7, y + 5);
-    R(ctx, x + 6, y + 19, w - 12, 1, "#d7dbe2");
-    ctx.font = FONT;
-    const todos = o?.todos || [];
-    if (!todos.length) {
-      ctx.fillStyle = "#7b8190";
-      const lines = wrap(ctx, o?.request ? `요청: ${o.request}` : "요청을 기다리는 중…", w - 16, 5);
-      lines.forEach((l, i) => ctx.fillText(l, x + 8, y + 24 + i * 14));
-      return;
+  drawParticles(ctx, now) {
+    const dt = this.lastT ? Math.min(60, now - this.lastT) : 16;
+    this.lastT = now;
+    this.parts = this.parts.filter((p) => p.age < p.life);
+    for (const p of this.parts) {
+      p.age += dt;
+      p.vy += 0.0004 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      ctx.globalAlpha = Math.max(0, 1 - p.age / p.life);
+      R(ctx, p.x, p.y, 3, 3, p.c);
     }
-    const done = todos.filter((t) => t.status === "completed").length;
-    ctx.fillStyle = "#7b8190";
-    const prog = `${done}/${todos.length}`;
-    ctx.fillText(prog, x + w - 8 - ctx.measureText(prog).width, y + 5);
-    // keep the current item visible
-    const cur = Math.max(0, todos.findIndex((t) => t.status !== "completed"));
-    const start = Math.min(Math.max(0, cur - 1), Math.max(0, todos.length - 5));
-    todos.slice(start, start + 5).forEach((td, i) => {
-      const yy = y + 24 + i * 14;
-      if (td.status === "completed") {
-        ctx.fillStyle = "#3fae6a";
-        ctx.fillText("✓", x + 8, yy);
-        ctx.fillStyle = "#a4aab5";
-      } else if (td.status === "in_progress") {
-        R(ctx, x + 4, yy - 1, w - 8, 13, "#e6efff");
-        ctx.fillStyle = "#3b6fe0";
-        ctx.fillText("▶", x + 8, yy);
-      } else {
-        ctx.fillStyle = "#9aa0ab";
-        ctx.fillText("○", x + 8, yy);
-        ctx.fillStyle = PAL.ink;
-      }
-      if (td.status === "in_progress") ctx.fillStyle = "#1e3a8a";
-      const txt = fit(ctx, td.text, w - 30);
-      ctx.fillText(txt, x + 21, yy);
-      if (td.status === "completed") R(ctx, x + 21, yy + 6, ctx.measureText(txt).width, 1, "#a4aab5");
-    });
-  }
-
-  tv(ctx, o, now) {
-    const x = 724;
-    const y = 30;
-    const w = 140;
-    const h = 78;
-    box(ctx, x - 3, y - 3, w + 6, h + 6, PAL.metal);
-    R(ctx, x, y, w, h, "#10162a");
-    ctx.font = FONT;
-    ctx.textBaseline = "top";
-    const active = o ? [LEAD, ...ROLES].filter((d) => deskLook(o.desks[d.key], now, o.ended).tone === "busy").length : 0;
-    const mins = o && o.stats.startTs ? Math.floor((o.stats.lastTs - o.stats.startTs) / 60000) : 0;
-    ctx.fillStyle = "#7f8bb0";
-    ctx.fillText("TEAM LIVE", x + 6, y + 5);
-    const live = o && now - o.stats.lastTs < 60_000;
-    disc(ctx, x + w - 10, y + 10, 3, live ? (Math.floor(now / 500) % 2 ? "#ff5d5d" : "#ff9a9a") : "#4b536d");
-    ctx.font = FONT_B;
-    const stat = (label, value, yy, c) => {
-      ctx.fillStyle = "#9aa6c8";
-      ctx.font = FONT;
-      ctx.fillText(label, x + 6, yy);
-      ctx.fillStyle = c;
-      ctx.font = FONT_B;
-      const v = String(value);
-      ctx.fillText(v, x + w - 8 - ctx.measureText(v).width, yy);
-    };
-    stat("근무 중", `${active}/7`, y + 22, "#7ef0b0");
-    stat("도구 사용", o?.stats.tools ?? 0, y + 36, "#8fb4ff");
-    stat("업무 위임", o?.stats.delegations ?? 0, y + 50, "#f7c873");
-    stat("경과", `${mins}분`, y + 64, "#ff9fc4");
-  }
-
-  namePlate(ctx, d, x, y) {
-    // navy label like the Pixel District map tags, with the role colour as a dot
-    ctx.font = FONT_B;
-    ctx.textBaseline = "top";
-    const label = d.key === "lead" ? `${d.en} · ${d.name}` : `${d.name} · ${d.en}`;
-    const w = Math.ceil(ctx.measureText(label).width) + 22;
-    box(ctx, x - w / 2, y - 1, w, 16, PAL.ink, PAL.ink, 2);
-    disc(ctx, Math.round(x - w / 2 + 8), y + 7, 3, d.color);
-    ctx.fillStyle = PAL.white;
-    ctx.fillText(label, Math.round(x - w / 2 + 15), y + 1);
-  }
-
-  statusPill(ctx, d, look, g) {
-    const tone = { busy: "#3b82f6", done: "#22c55e", error: "#ef4444", wait: "#f59e0b", idle: "#94a3b8", off: "#b8b0a3" }[look.tone];
-    ctx.font = FONT;
-    ctx.textBaseline = "top";
-    const text = look.status;
-    const w = Math.ceil(ctx.measureText(text).width) + 20;
-    const x = Math.round(g.cx - w / 2);
-    const y = g.gy + 4;
-    box(ctx, x, y, w, 15, "rgba(255,255,255,0.92)", "rgba(31,43,64,0.3)");
-    disc(ctx, x + 7, y + 7, 2, tone);
-    ctx.fillStyle = PAL.ink;
-    ctx.fillText(text, x + 13, y + 1);
-  }
-
-  bubble(ctx, d, desk_, look, now) {
-    const b = desk_.bubble;
-    if (!b) return;
-    const age = now - b.ts;
-    const sticky = look.tone === "busy" && (b.kind === "tool" || b.kind === "task" || b.kind === "prompt" || b.kind === "delegate");
-    const life = sticky ? 60_000 : b.kind === "notify" ? 30_000 : 9000;
-    if (age > life || look.anim === "sleep") return;
-    const g = LAYOUT[d.key];
-    ctx.font = FONT;
-    ctx.textBaseline = "top";
-    const maxW = d.key === "lead" ? 210 : 176;
-    const lines = b.kind === "tool" ? [fit(ctx, b.text, maxW - 14)] : wrap(ctx, b.text, maxW - 14, 2);
-    const w = Math.min(maxW, Math.ceil(Math.max(...lines.map((l) => ctx.measureText(l).width))) + 14);
-    const h = lines.length * 14 + 8;
-    let x = Math.round(g.cx - w / 2 + 6);
-    x = Math.max(4, Math.min(W - w - 4, x));
-    const y = g.seatY - 104 - h;
-    const pop = Math.min(1, age / 140);
-    ctx.globalAlpha = age > life - 600 ? Math.max(0, (life - age) / 600) : 1;
-    const border = b.kind === "error" ? "#ef4444" : b.kind === "notify" ? "#f59e0b" : b.kind === "done" ? "#22c55e" : PAL.ink;
-    const yy = y + Math.round((1 - pop) * 4);
-    R(ctx, x + 2, yy + 2, w, h, "rgba(31,43,64,0.16)");
-    box(ctx, x, yy, w, h, "#ffffff", border);
-    R(ctx, x + 1, yy + 1, 3, h - 2, d.color);
-    // tail
-    const tx = Math.max(x + 8, Math.min(x + w - 12, g.cx + 4));
-    R(ctx, tx, yy + h - 1, 6, 2, "#ffffff");
-    R(ctx, tx + 1, yy + h + 1, 4, 2, "#ffffff");
-    R(ctx, tx + 2, yy + h + 3, 2, 2, "#ffffff");
-    R(ctx, tx - 1, yy + h, 1, 2, border);
-    R(ctx, tx + 6, yy + h, 1, 2, border);
-    R(ctx, tx, yy + h + 2, 1, 2, border);
-    R(ctx, tx + 5, yy + h + 2, 1, 2, border);
-    R(ctx, tx + 1, yy + h + 4, 1, 2, border);
-    R(ctx, tx + 4, yy + h + 4, 1, 2, border);
-    R(ctx, tx + 2, yy + h + 5, 2, 1, border);
-    ctx.fillStyle = PAL.ink;
-    lines.forEach((l, i) => ctx.fillText(l, x + 8, yy + 4 + i * 14));
     ctx.globalAlpha = 1;
   }
 
@@ -614,52 +575,50 @@ export class OfficeScene {
       R(ctx, x - 4 * dir, y + 1, 5, 2, "#d9dee8");
       R(ctx, x - 6 * dir, y - 1, 2, 1, PAL.ink);
     }
+    if (this.planes.length === 0) this.instant = false;
   }
 
   lounge(items, t) {
     const ctx = this.ctx;
-    // sofa (seen from the front)
     items.push({
-      y: 530,
+      y: 560,
       draw: () => {
         const x = 692;
-        const y = 478;
-        box(ctx, x, y, 148, 30, PAL.navy, PAL.ink, 2); // back
+        const y = 512;
+        box(ctx, x, y, 148, 30, PAL.navy, PAL.ink, 2);
         for (let i = 0; i < 3; i++) box(ctx, x + 8 + i * 44, y + 6, 44, 20, "#3d6283", "#2a4a66");
-        box(ctx, x - 6, y + 22, 160, 30, "#3d6283", PAL.ink, 2); // seat
+        box(ctx, x - 6, y + 22, 160, 30, "#3d6283", PAL.ink, 2);
         R(ctx, x - 5, y + 23, 158, 3, "#5a83a6");
-        box(ctx, x - 12, y + 14, 14, 38, PAL.navy, PAL.ink); // arms
+        box(ctx, x - 12, y + 14, 14, 38, PAL.navy, PAL.ink);
         box(ctx, x + 146, y + 14, 14, 38, PAL.navy, PAL.ink);
         R(ctx, x, y + 52, 4, 4, PAL.metal);
         R(ctx, x + 144, y + 52, 4, 4, PAL.metal);
-        box(ctx, x + 16, y + 12, 22, 16, PAL.terracotta, PAL.terracottaDark); // cushions
+        box(ctx, x + 16, y + 12, 22, 16, PAL.terracotta, PAL.terracottaDark);
         box(ctx, x + 110, y + 12, 22, 16, "#e9d7b8", PAL.oakDark);
       },
     });
-    // coffee table + laptop
     items.push({
-      y: 462,
+      y: 494,
       draw: () => {
-        ellipse(ctx, 764, 460, 30, 9, "rgba(60,40,20,0.15)");
-        ellipse(ctx, 764, 446, 30, 10, PAL.ink);
-        ellipse(ctx, 764, 445, 28, 8, PAL.oak);
-        R(ctx, 762, 450, 4, 10, PAL.metal);
-        mug(ctx, 772, 436, PAL.white, t, false);
-        box(ctx, 744, 438, 18, 6, "#e3c26a", PAL.oakDark);
+        ellipse(ctx, 764, 494, 30, 9, "rgba(60,40,20,0.15)");
+        ellipse(ctx, 764, 480, 30, 10, PAL.ink);
+        ellipse(ctx, 764, 479, 28, 8, PAL.oak);
+        R(ctx, 762, 484, 4, 10, PAL.metal);
+        mug(ctx, 772, 470, PAL.white, t, false);
+        box(ctx, 744, 472, 18, 6, "#e3c26a", PAL.oakDark);
       },
     });
-    items.push({ y: 412, draw: () => monstera(ctx, 858, 412, 1.1, t) });
-    items.push({ y: 552, draw: () => monstera(ctx, 30, 552, 1.25, t) });
-    items.push({ y: 548, draw: () => snakePlant(ctx, 642, 548, 54, PAL.metal) });
-    items.push({ y: 290, draw: () => snakePlant(ctx, 22, 290, 50, PAL.terracotta) });
-    // floor lamp
+    items.push({ y: 452, draw: () => monstera(ctx, 858, 452, 1.1, t) });
+    items.push({ y: 592, draw: () => monstera(ctx, 30, 592, 1.25, t) });
+    items.push({ y: 588, draw: () => snakePlant(ctx, 642, 588, 54, PAL.metal) });
+    items.push({ y: 340, draw: () => snakePlant(ctx, 22, 340, 50, PAL.terracotta) });
     items.push({
-      y: 520,
+      y: 550,
       draw: () => {
-        R(ctx, 666, 400, 2, 120, PAL.metal);
-        R(ctx, 658, 518, 18, 3, PAL.metal);
-        ellipse(ctx, 667, 398, 12, 6, "#f3e2c0");
-        R(ctx, 655, 398, 24, 2, "#d7c39b");
+        R(ctx, 666, 430, 2, 120, PAL.metal);
+        R(ctx, 658, 548, 18, 3, PAL.metal);
+        ellipse(ctx, 667, 428, 12, 6, "#f3e2c0");
+        R(ctx, 655, 428, 24, 2, "#d7c39b");
       },
     });
   }
@@ -676,25 +635,17 @@ export class OfficeScene {
       R(ctx, gx, y0, 12, 2, PAL.metal);
       R(ctx, gx + 3, y0 + 6, 1, 18, PAL.glassEdge);
     };
-    items.push({ y: 230, draw: () => pane(168, 236) });
+    items.push({ y: 230, draw: () => pane(168, 250) });
     items.push({
-      y: 380,
+      y: 412,
       draw: () => {
-        pane(296, 380);
+        pane(316, 412);
         ctx.fillStyle = "rgba(190,225,240,0.16)";
-        ctx.fillRect(gx + 12, 362, W - gx - 12, 16);
-        R(ctx, gx, 378, W - gx, 3, PAL.metal);
-        R(ctx, gx + 12, 362, W - gx - 12, 1, PAL.glassEdge);
-        for (let x = gx + 30; x < W; x += 56) R(ctx, x, 364, 14, 1, "rgba(255,255,255,0.6)");
+        ctx.fillRect(gx + 12, 394, W - gx - 12, 16);
+        R(ctx, gx, 410, W - gx, 3, PAL.metal);
+        R(ctx, gx + 12, 394, W - gx - 12, 1, PAL.glassEdge);
+        for (let x = gx + 30; x < W; x += 56) R(ctx, x, 396, 14, 1, "rgba(255,255,255,0.6)");
       },
     });
   }
-
-  /** desk under a canvas point (for hover / click) */
-  hit(x, y) {
-    for (const [key, g] of Object.entries(LAYOUT)) if (x > g.cx - g.w / 2 && x < g.cx + g.w / 2 && y > g.seatY - 100 && y < g.gy + 20) return key;
-    return null;
-  }
 }
-
-export { deskByKey, toolLabel };

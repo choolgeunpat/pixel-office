@@ -63,10 +63,25 @@ export function describeTarget(tool, input) {
 
 function todosOf(input) {
   if (!input || !Array.isArray(input.todos)) return null;
-  return input.todos.slice(0, 20).map((t) => ({
-    text: clip(t.content || t.subject || t.activeForm, 80),
+  return input.todos.slice(0, 30).map((t) => ({
+    text: clip(t.content || t.subject || t.activeForm, 90),
+    // "~하는 중" wording of the same item, shown while it is in progress
+    active: clip(t.activeForm || t.content || t.subject, 90),
     status: ["pending", "in_progress", "completed"].includes(t.status) ? t.status : "pending",
   }));
+}
+
+/** What kind of shell command this is, so the UI can say it in plain words. */
+export function bashKind(cmd) {
+  const c = String(cmd || "");
+  if (/\b(test|jest|vitest|pytest|playwright|mocha|cypress|rspec)\b/i.test(c)) return "test";
+  if (/\b(npm|yarn|pnpm|bun)\s+(i|install|add|ci)\b|\bpip3?\s+install\b|\bbrew\s+install\b|\bapt(-get)?\s+install\b|\bcargo\s+(add|install)\b/i.test(c)) return "install";
+  if (/\bgit\s+(commit|push|add|merge|pull|rebase|checkout|stash|tag)\b/i.test(c)) return "git";
+  if (/\b(build|compile|tsc|webpack|bundle)\b/i.test(c)) return "build";
+  if (/\b(lint|eslint|prettier|format|ruff|black)\b/i.test(c)) return "lint";
+  if (/\b(curl|wget|http)\b/i.test(c)) return "net";
+  if (/^\s*(ls|cat|find|grep|rg|head|tail|pwd|tree|wc|git\s+(status|diff|log))\b/i.test(c)) return "look";
+  return "run";
 }
 
 function failed(resp) {
@@ -98,6 +113,7 @@ export function normalize(raw, ts = Date.now()) {
       return { ...ev, kind: "prompt", text: clip(raw.prompt, 240) };
     case "PreToolUse": {
       const out = { ...ev, kind: "tool_start", tool, target: describeTarget(tool, raw.tool_input), useId: raw.tool_use_id || null };
+      if (tool === "Bash") out.cmdKind = bashKind(raw.tool_input && raw.tool_input.command);
       if (DELEGATE_TOOLS.has(tool)) {
         const i = raw.tool_input || {};
         out.delegate = { type: clip(i.subagent_type || "general-purpose", 60), description: clip(i.description || i.prompt, 120) };

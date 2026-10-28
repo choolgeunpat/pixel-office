@@ -1,0 +1,10 @@
+# One-click deploy on Render: https://render.com/deploy?repo=https://github.com/choolgeunpat/pixel-office
+services:
+  - type: web
+    name: pixel-office
+    runtime: node
+    plan: free
+    buildCommand: "true"
+    startCommand: node server/index.mjs
+    healthCheckPath: /healthz
+    autoDeploy: true

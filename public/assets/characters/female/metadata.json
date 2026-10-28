@@ -1,0 +1,478 @@
+{
+  "character": "female",
+  "version": 1,
+  "frameWidth": 108,
+  "frameHeight": 112,
+  "padding": 2,
+  "layout": "one row per file, frame i at x = i * (frameWidth + padding)",
+  "anchor": {
+    "x": 54,
+    "y": 107,
+    "note": "ground point: hip centre x, row below the soles"
+  },
+  "pixelScale": "1 art px = 1 image px; render at integer scale with image-rendering: pixelated",
+  "characterHeight": 90,
+  "sideFacing": "right (mirror horizontally for left)",
+  "directions": {
+    "idle": {
+      "front": "idle",
+      "back": "idle_back"
+    },
+    "walk": {
+      "front": "walk",
+      "side": "walk_side",
+      "back": "walk_back"
+    },
+    "run": {
+      "side": "run"
+    },
+    "jump": {
+      "front": "jump"
+    },
+    "sit": {
+      "front": "sit"
+    },
+    "sleep": {
+      "front": "sleep"
+    },
+    "happy": {
+      "front": "happy"
+    },
+    "sad": {
+      "front": "sad"
+    },
+    "interact": {
+      "side": "interact"
+    },
+    "mine": {
+      "side": "mine"
+    },
+    "catch": {
+      "front": "catch"
+    }
+  },
+  "fallback": {
+    "side": [
+      "side",
+      "front"
+    ],
+    "back": [
+      "back",
+      "front"
+    ],
+    "front": [
+      "front"
+    ]
+  },
+  "animations": {
+    "idle": {
+      "file": "idle.png",
+      "direction": "front",
+      "frameCount": 8,
+      "fps": 6,
+      "loop": true,
+      "hold": [
+        2,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        1
+      ],
+      "frames": [
+        "idle_0",
+        "idle_1",
+        "idle_2",
+        "idle_3",
+        "idle_4",
+        "idle_5",
+        "idle_6",
+        "idle_0+blink"
+      ],
+      "source": "reference+edited"
+    },
+    "idle_back": {
+      "file": "idle_back.png",
+      "direction": "back",
+      "frameCount": 4,
+      "fps": 4,
+      "loop": true,
+      "hold": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "frames": [
+        "back",
+        "back+breathe:1",
+        "back+breathe:1",
+        "back"
+      ],
+      "source": "reference+edited"
+    },
+    "walk": {
+      "file": "walk.png",
+      "direction": "front",
+      "frameCount": 6,
+      "fps": 8,
+      "loop": true,
+      "hold": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "frames": [
+        "idle_0+step:left,2",
+        "idle_0+step:left,1+breathe:1",
+        "idle_0",
+        "idle_0+step:right,2",
+        "idle_0+step:right,1+breathe:1",
+        "idle_0"
+      ],
+      "source": "reference+edited"
+    },
+    "walk_side": {
+      "file": "walk_side.png",
+      "direction": "side",
+      "frameCount": 6,
+      "fps": 10,
+      "loop": true,
+      "hold": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "frames": [
+        "walk_0",
+        "walk_1",
+        "walk_2",
+        "walk_3",
+        "walk_4",
+        "walk_5"
+      ],
+      "source": "reference"
+    },
+    "walk_back": {
+      "file": "walk_back.png",
+      "direction": "back",
+      "frameCount": 6,
+      "fps": 8,
+      "loop": true,
+      "hold": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "frames": [
+        "back+step:left,2",
+        "back+step:left,1+breathe:1",
+        "back",
+        "back+step:right,2",
+        "back+step:right,1+breathe:1",
+        "back"
+      ],
+      "source": "reference+edited"
+    },
+    "run": {
+      "file": "run.png",
+      "direction": "side",
+      "frameCount": 6,
+      "fps": 12,
+      "loop": true,
+      "hold": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "frames": [
+        "run_0",
+        "run_1",
+        "run_2",
+        "run_3",
+        "run_4",
+        "run_5"
+      ],
+      "source": "reference"
+    },
+    "jump": {
+      "file": "jump.png",
+      "direction": "front",
+      "frameCount": 10,
+      "fps": 12,
+      "loop": false,
+      "hold": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "frames": [
+        "idle_0+squash:2",
+        "idle_0+squash:4",
+        "idle_0+stretch:2+lift:4",
+        "idle_0+lift:11",
+        "idle_0+lift:14",
+        "idle_0+lift:10",
+        "idle_0+stretch:1+lift:4",
+        "idle_0+squash:4",
+        "idle_0+squash:2",
+        "idle_0"
+      ],
+      "source": "reference+edited"
+    },
+    "sit": {
+      "file": "sit.png",
+      "direction": "front",
+      "frameCount": 4,
+      "fps": 4,
+      "loop": true,
+      "hold": [
+        3,
+        2,
+        3,
+        1
+      ],
+      "frames": [
+        "sit_2",
+        "sit_2+breathe:1",
+        "sit_2",
+        "sit_2+blink"
+      ],
+      "source": "reference+edited"
+    },
+    "sleep": {
+      "file": "sleep.png",
+      "direction": "front",
+      "frameCount": 4,
+      "fps": 3,
+      "loop": true,
+      "hold": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "frames": [
+        "sit_2+blink",
+        "sit_2+blink+breathe:1",
+        "sit_2+blink+breathe:1+head_drop:1",
+        "sit_2+blink+breathe:1"
+      ],
+      "source": "edited-from-reference"
+    },
+    "happy": {
+      "file": "happy.png",
+      "direction": "front",
+      "frameCount": 4,
+      "fps": 6,
+      "loop": true,
+      "hold": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "frames": [
+        "happy_0",
+        "happy_1",
+        "happy_2",
+        "happy_1"
+      ],
+      "source": "reference"
+    },
+    "sad": {
+      "file": "sad.png",
+      "direction": "front",
+      "frameCount": 4,
+      "fps": 4,
+      "loop": true,
+      "hold": [
+        2,
+        2,
+        3,
+        1
+      ],
+      "frames": [
+        "miss_0",
+        "miss_1",
+        "miss_1+head_drop:1",
+        "miss_1"
+      ],
+      "source": "reference+edited"
+    },
+    "interact": {
+      "file": "interact.png",
+      "direction": "side",
+      "frameCount": 5,
+      "fps": 5,
+      "loop": true,
+      "hold": [
+        1,
+        2,
+        1,
+        2,
+        1
+      ],
+      "frames": [
+        "idle_0",
+        "carry",
+        "carry+breathe:1",
+        "carry",
+        "carry+breathe:1"
+      ],
+      "source": "reference+edited"
+    },
+    "mine": {
+      "file": "mine.png",
+      "direction": "side",
+      "frameCount": 4,
+      "fps": 8,
+      "loop": true,
+      "hold": [
+        1,
+        1,
+        1,
+        2
+      ],
+      "frames": [
+        "walk_0+hands_off:side+tool_from:mine_0",
+        "walk_0+hands_off:side+lean:1+tool_from:mine_1",
+        "walk_0+hands_off:side+lean:1+tool_from:mine_2",
+        "walk_0+hands_off:side+lean:2+squash:1+tool_from:mine_3"
+      ],
+      "source": "edited-from-reference",
+      "handAnchor": [
+        [
+          80,
+          68
+        ],
+        [
+          83,
+          63
+        ],
+        [
+          80,
+          69
+        ],
+        [
+          78,
+          65
+        ]
+      ],
+      "toolTip": [
+        [
+          83,
+          63
+        ],
+        [
+          87,
+          56
+        ],
+        [
+          90,
+          61
+        ],
+        [
+          79,
+          70
+        ]
+      ],
+      "toolAngle": [
+        -56,
+        -62,
+        -38,
+        79
+      ],
+      "impactFrame": 3,
+      "includesTool": true,
+      "rig": "the pickaxe / ore is part of the sprite (no overlay needed). handAnchor[i] = where the hands hold the tool (mine) or the ore (catch), toolTip[i] = pickaxe head, toolAngle[i] = grip→head in deg (0 = +x, clockwise positive); frame px, side view facing right (mirror x for left); impactFrame = the frame where the head hits"
+    },
+    "catch": {
+      "file": "catch.png",
+      "direction": "front",
+      "frameCount": 3,
+      "fps": 6,
+      "loop": false,
+      "hold": [
+        2,
+        2,
+        4
+      ],
+      "frames": [
+        "idle_0+hands_off:front+ore_from:catch_0",
+        "idle_0+hands_off:front+ore_from:catch_1",
+        "idle_0+hands_off:front+ore_from:catch_2"
+      ],
+      "source": "edited-from-reference",
+      "handAnchor": [
+        [
+          54,
+          76
+        ],
+        [
+          55,
+          77
+        ],
+        [
+          56,
+          79
+        ]
+      ],
+      "includesTool": true,
+      "rig": "the pickaxe / ore is part of the sprite (no overlay needed). handAnchor[i] = where the hands hold the tool (mine) or the ore (catch), toolTip[i] = pickaxe head, toolAngle[i] = grip→head in deg (0 = +x, clockwise positive); frame px, side view facing right (mirror x for left); impactFrame = the frame where the head hits"
+    }
+  },
+  "palette": {
+    "hair": [
+      "#3c1614",
+      "#30212a",
+      "#3c2d39",
+      "#4a3742",
+      "#5a414a",
+      "#694c54",
+      "#7a5b5f",
+      "#887176",
+      "#9d868c"
+    ],
+    "skin": [
+      "#cb8a7d",
+      "#e7a695",
+      "#f5bfab",
+      "#f6d0bd",
+      "#f8dcc9"
+    ],
+    "outfit": [
+      "#232b45",
+      "#263250",
+      "#2e3a54",
+      "#435574",
+      "#4d5b79",
+      "#657085",
+      "#7f8294",
+      "#7c89a3",
+      "#9598a7"
+    ],
+    "note": "groups recoloured by the game's palette remap (luminance-preserving); every other colour is fixed"
+  }
+}

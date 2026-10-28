@@ -1,0 +1,10 @@
+{
+  "name": "pixel-office",
+  "version": "0.1.0",
+  "description": "Stream your Claude Code session to a live pixel-art office, with a six-person subagent team (planner, developer, tester, marketer, designer, reviewer).",
+  "author": {
+    "name": "choolgeunpat"
+  },
+  "homepage": "https://github.com/choolgeunpat/pixel-office",
+  "license": "MIT"
+}

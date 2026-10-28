@@ -1,0 +1,13 @@
+{
+  "name": "pixel-office",
+  "owner": {
+    "name": "choolgeunpat"
+  },
+  "plugins": [
+    {
+      "name": "pixel-office",
+      "source": "./plugin",
+      "description": "Live pixel-art office for your Claude Code sessions + a six-person subagent team."
+    }
+  ]
+}

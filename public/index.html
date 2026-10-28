@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pixel Office</title>
+    <meta name="description" content="Claude Code 세션이 일하는 모습을 픽셀 오피스로 실시간 시각화" />
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <a class="brand" href="/">
+        <img src="/favicon.svg" alt="" width="22" height="22" />
+        <span class="pixel">Pixel Office</span>
+        <span class="ver">for Claude Code</span>
+      </a>
+      <div class="room" id="roomChip" hidden></div>
+      <div class="spacer"></div>
+      <div class="conn" id="conn"><i></i><span>연결 중…</span></div>
+      <button class="btn" id="btnDemo" hidden>▶ 데모 보기</button>
+      <button class="btn" id="btnCopy" hidden>🔗 링크 복사</button>
+      <button class="btn primary" id="btnSetup">⚙ 연결 방법</button>
+    </header>
+
+    <main class="layout">
+      <aside class="col left">
+        <section class="card">
+          <h2>세션 <small id="sessionCount"></small></h2>
+          <div id="sessions" class="sessions"></div>
+        </section>
+        <section class="card">
+          <h2>지금 요청</h2>
+          <p id="request" class="request muted">요청을 기다리는 중…</p>
+          <div id="todoList" class="todos"></div>
+        </section>
+      </aside>
+
+      <section class="stage-wrap">
+        <div class="stage" id="stage">
+          <canvas id="office" aria-label="픽셀 오피스"></canvas>
+          <div class="hero" id="hero" hidden>
+            <div class="hero-card">
+              <p class="eyebrow pixel">PIXEL OFFICE</p>
+              <h1>내 Claude 세션이 일하는 모습을<br />픽셀 오피스로 실시간 확인</h1>
+              <p class="muted">기획 · 개발 · 테스트 · 마케팅 · 디자인 · 리뷰 — 서브에이전트마다 자기 책상이 있어요. 지금 보이는 건 데모예요.</p>
+              <div class="row">
+                <button class="btn primary big" id="btnCreate">내 사무실 만들기 →</button>
+                <button class="btn ghost big" id="btnHideHero">데모 계속 보기</button>
+              </div>
+            </div>
+          </div>
+          <div class="empty" id="empty" hidden>
+            <div>
+              <p class="pixel">아직 아무도 출근하지 않았어요</p>
+              <p class="muted">이 사무실에 연결된 Claude Code 세션을 시작하면 바로 나타나요.</p>
+              <button class="btn primary" id="btnEmptySetup">연결 방법 보기</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="col right">
+        <section class="card">
+          <h2>팀 상태 <small id="activeCount"></small></h2>
+          <div id="team" class="team"></div>
+        </section>
+        <section class="card grow">
+          <h2>이벤트 로그 <small id="eventCount"></small></h2>
+          <ol id="log" class="log"></ol>
+        </section>
+      </aside>
+    </main>
+
+    <dialog id="setup" class="modal">
+      <form method="dialog" class="modal-head">
+        <h2>내 Claude Code 세션 연결하기</h2>
+        <button class="x" aria-label="닫기">✕</button>
+      </form>
+      <div class="modal-body" id="setupBody"></div>
+    </dialog>
+
+    <div class="toast" id="toast" hidden></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

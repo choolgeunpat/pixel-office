@@ -14,6 +14,9 @@ const roomKey = (path.match(/^\/r\/([A-Za-z0-9_-]{12,64})\/?$/) || [])[1] || nul
 const isDemo = !roomKey;
 const ORIGIN = location.origin;
 const roomUrl = roomKey ? `${ORIGIN}/r/${roomKey}` : null;
+// the office started by `npx github:choolgeunpat/pixel-office` on this PC
+const isLocal = roomKey === "my-local-office";
+const LOCAL_CMD = "npx -y github:choolgeunpat/pixel-office";
 
 // ------------------------------------------------------------------ state
 let events = [];
@@ -303,6 +306,16 @@ function setupHtml(tab) {
 
 function openSetup(tab = "cloud") {
   const body = $("#setupBody");
+  if (isLocal) {
+    body.innerHTML = `<ol class="steps">
+      <li><div><h3>✅ 이 PC는 이미 연결돼 있어요</h3><p>평소처럼 Claude Code를 쓰면 팀원들이 출근해요. 이미 켜져 있던 Claude Code는 한 번 껐다 켜 주세요.</p></div></li>
+      <li><div><h3>다음에 사무실을 다시 볼 때</h3><p>터미널에 아래 한 줄을 붙여넣고 Enter.</p>${codeBlock(LOCAL_CMD)}</div></li>
+      <li><div><h3>다른 사람에게 주기</h3><p>아래 문장을 그대로 보내 주세요.</p>${codeBlock(`Claude가 일하는 모습을 픽셀 사무실로 보는 Pixel Office예요!\n(Node.js가 없다면 nodejs.org 에서 먼저 설치)\n터미널에 아래 한 줄을 붙여넣고 Enter 하면 끝이에요.\n\n${LOCAL_CMD}`)}</div></li>
+    </ol>
+    <div class="note" style="margin-top:16px">지우고 싶을 때: <code>${LOCAL_CMD} uninstall</code></div>`;
+    if (!$("#setup").open) $("#setup").showModal();
+    return;
+  }
   if (!roomUrl) {
     body.innerHTML = `<ol class="steps"><li><div><h3>먼저 내 사무실을 만드세요</h3><p>버튼을 누르면 나만의 사무실 주소가 생기고, 그 주소가 들어간 설치 안내가 바로 나와요.</p><button class="btn primary big" data-create>내 사무실 만들기 →</button></div></li></ol>`;
   } else {
@@ -353,9 +366,14 @@ async function boot() {
   await Promise.all([loadMeta(), document.fonts.load("12px Galmuri11"), document.fonts.load("12px 'Galmuri11 Bold'")]).catch(() => {});
   if (roomKey) {
     $("#roomChip").hidden = false;
-    $("#roomChip").textContent = `🔑 ${roomKey.slice(0, 6)}…`;
+    $("#roomChip").textContent = isLocal ? "💻 내 PC 사무실" : `🔑 ${roomKey.slice(0, 6)}…`;
     $("#roomChip").title = roomUrl;
-    $("#btnCopy").hidden = false;
+    $("#btnCopy").hidden = isLocal;
+    if (isLocal) {
+      $("#btnSetup").textContent = "📤 다른 사람에게 주기";
+      $("#empty .muted").textContent = "Claude Code를 켜고 아무 일이나 시켜 보세요. (이미 켜져 있었다면 껐다 켜 주세요)";
+      $("#btnEmptySetup").hidden = true;
+    }
     $("#btnDemo").hidden = false;
     connectRoom();
     if (new URLSearchParams(location.search).get("setup")) {

@@ -4,11 +4,17 @@
   "description": "Watch your Claude Code session work as a live pixel-art office (planner, developer, tester, marketer, designer, reviewer).",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server/index.mjs",
     "dev": "node --watch server/index.mjs",
     "build:kit": "node scripts/build-kit.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "office": "node bin/pixel-office.mjs"
+  },
+  "bin": {
+    "pixel-office": "bin/pixel-office.mjs"
   }
 }

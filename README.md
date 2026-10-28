@@ -4,7 +4,19 @@
 
 기획 · 개발 · 테스트 · 마케팅 · 디자인 · 리뷰, 여섯 명의 팀원(서브에이전트)에게 각자 책상이 있습니다. 팀장(Claude)이 일을 나눠 주면 팀원이 출근해서 자리에 앉아요. 지금 어떤 파일을 읽는지, 어떤 명령을 실행하는지 말풍선으로 보여 주고, 화이트보드에는 할 일 목록이 실시간으로 올라갑니다. 클라우드 세션(claude.ai/code)과 로컬 Claude Code 모두에서 동작합니다.
 
-> 📖 **코딩을 몰라도 복붙만으로 따라 할 수 있는 [사용 설명서(MANUAL.md)](MANUAL.md)가 있어요.**
+## ⚡ 가장 쉬운 방법: 내 PC에서 한 줄
+
+[Node.js](https://nodejs.org)가 설치된 PC에서 터미널을 열고 아래 한 줄을 실행하세요. 서버도, 주소도, 가입도 필요 없습니다.
+
+```bash
+npx -y github:choolgeunpat/pixel-office
+```
+
+- 이 PC의 Claude Code(모든 프로젝트)에 hook과 팀원 6명이 연결되고, 브라우저에 사무실이 열립니다. 이후 평소처럼 Claude Code를 쓰면 됩니다.
+- 지울 때는 `npx -y github:choolgeunpat/pixel-office uninstall` 을 실행하세요.
+
+> 📖 코딩을 몰라도 따라 할 수 있는 **[사용 설명서(MANUAL.md)](MANUAL.md)** 가 있어요.
+> 아래 "빠른 시작"은 **claude.ai 웹(클라우드) 세션**을 볼 때 필요한 서버 방식이에요.
 
 ![Pixel Office](docs/screenshot.png)
 
@@ -32,7 +44,7 @@ Claude Code 세션 ──(hooks)──▶ Pixel Office 서버 ──(SSE)──�
 
 ---
 
-## 빠른 시작 (5분)
+## 클라우드 세션용 빠른 시작 (서버 방식)
 
 ### 1. 서버 띄우기 (한 번만)
 

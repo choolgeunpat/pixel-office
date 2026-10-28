@@ -1,9 +1,10 @@
 /**
- * The office cats: five pixel cats (sheets made by tools/cats/make_cats.py) that live their own
+ * The office cats: five pixel cats (the reference sheet's Grey & White, Black, White & Grey Tabby, Cream, Calico) that live their own
  * life — walking the aisles, sitting, washing, stretching, napping on beds, the sofa, under
  * desks and next to the monitors. They are scenery: nothing they do claims real work.
  *
- * Frames are 40×32, facing right (flipped for left), feet at (20,30). Rows come from metadata.json.
+ * Frames are cut from docs/design/cats/reference-cats.webp by tools/cats/extract_sheet.py (48×40, facing
+ * right and flipped for left, feet at the anchor). Rows come from metadata.json.
  */
 import { LAYOUT } from "./layout.js";
 
@@ -116,7 +117,7 @@ const ACTS = {
   floor: [["sit", 34], ["wash", 22], ["stretch", 14], ["sleep", 10]],
   bed: [["sleep", 80], ["stretch", 8], ["sit", 8]],
   sofa: [["sleep", 80], ["wash", 10], ["sit", 10]],
-  under: [["sleep", 85], ["wash", 15]],
+  under: [["sleep", 100]],
   desk: [["sit", 55], ["wash", 20], ["sleep", 25]],
 };
 const DUR = { sit: [5000, 11000], wash: [3500, 6500], stretch: [1500, 1500], sleep: [14000, 38000] };
@@ -239,6 +240,7 @@ export class Cats {
           c.x += (dx / d) * step;
           c.y += (dy / d) * step;
           if (Math.abs(dx) > 0.5) c.dir = dx > 0 ? 1 : -1;
+          c.vert = Math.abs(dy) > Math.abs(dx) * 1.3; // up/down the aisles: the front-facing walk
         }
         c.sort = c.y;
       } else {
@@ -263,14 +265,13 @@ export class Cats {
     }
   }
 
-  /** @returns {{y:number, draw:Function}[]} drawables; `k` = device px per cat pixel (integer) */
+  /** @returns {{y:number, draw:Function}[]} drawables; a cat pixel is a whole number of device pixels, ~1.5 world px */
   items(ctx, now, S) {
-    const k = Math.max(1, Math.round(1.4 * S));
-    const sc = k / S;
+    const sc = Math.max(1, Math.round(1.5 * S)) / S;
     return this.cats.map((c) => ({
       y: c.sort,
       draw: () => {
-        const meta = CAT_META.animations[c.state === "act" ? c.act : c.state === "walk" ? "walk" : "jump"];
+        const meta = CAT_META.animations[c.state === "act" ? c.act : c.state === "walk" ? (c.vert ? "walkfront" : "walk") : "jump"];
         const t = now - c.actStart + c.phase;
         let f = Math.floor((t / 1000) * meta.fps);
         f = meta.loop ? f % meta.frames : Math.min(meta.frames - 1, f);
@@ -283,7 +284,7 @@ export class Cats {
         // soft shadow on the ground
         ctx.fillStyle = "rgba(60,40,20,0.16)";
         ctx.beginPath();
-        ctx.ellipse(c.x, c.y, 9 * sc, 2.2 * sc, 0, 0, Math.PI * 2);
+        ctx.ellipse(c.x, c.y, 11 * sc, 2.8 * sc, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.save();
         ctx.translate(Math.round(c.x * S) / S, Math.round((c.y - lift) * S) / S);

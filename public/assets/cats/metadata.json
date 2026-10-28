@@ -1,47 +1,53 @@
 {
-  "frameWidth": 40,
-  "frameHeight": 32,
+  "frameWidth": 48,
+  "frameHeight": 40,
   "anchor": {
-    "x": 20,
-    "y": 30
+    "x": 24,
+    "y": 38
   },
   "facing": "right",
   "animations": {
-    "walk": {
+    "sit": {
       "row": 0,
       "frames": 4,
-      "fps": 8,
-      "loop": true
-    },
-    "sit": {
-      "row": 1,
-      "frames": 4,
-      "fps": 3,
+      "fps": 2.5,
       "loop": true
     },
     "wash": {
-      "row": 2,
-      "frames": 4,
-      "fps": 4,
+      "row": 1,
+      "frames": 2,
+      "fps": 1.5,
       "loop": true
     },
     "sleep": {
-      "row": 3,
+      "row": 2,
       "frames": 2,
       "fps": 1.2,
       "loop": true
     },
     "stretch": {
-      "row": 4,
-      "frames": 4,
-      "fps": 3,
+      "row": 3,
+      "frames": 5,
+      "fps": 4,
       "loop": false
     },
     "jump": {
-      "row": 5,
+      "row": 4,
       "frames": 2,
       "fps": 2,
       "loop": false
+    },
+    "walk": {
+      "row": 5,
+      "frames": 4,
+      "fps": 9,
+      "loop": true
+    },
+    "walkfront": {
+      "row": 6,
+      "frames": 2,
+      "fps": 6,
+      "loop": true
     }
   },
   "cats": {
@@ -57,13 +63,14 @@
       "name": "구름",
       "file": "cloud.png"
     },
-    "munchkin": {
+    "cream": {
       "name": "크림",
-      "file": "munchkin.png"
+      "file": "cream.png"
     },
     "calico": {
       "name": "미미",
       "file": "calico.png"
     }
-  }
+  },
+  "source": "docs/design/cats/reference-cats.webp"
 }

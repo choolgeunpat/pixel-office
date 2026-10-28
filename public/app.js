@@ -271,49 +271,52 @@ function codeBlock(text) {
   return `<div class="code"><button class="btn sm" data-copy="${esc(text)}">복사</button>${esc(text)}</div>`;
 }
 
+/** what to paste into a Claude Code session to install the office in its repo */
+function claudePrompt(installCmd) {
+  return `아래 명령을 이 저장소 루트에서 실행해서 Pixel Office를 설치해줘. 설치가 끝나면 바뀐 파일(.claude 폴더, CLAUDE.md)을 커밋하고 푸시해줘.\n\n${installCmd}`;
+}
+
 function setupHtml(tab) {
-  const url = roomUrl || `${ORIGIN}/r/<내-사무실-키>`;
+  const install = `curl -fsSL ${roomUrl}/install.sh | bash`;
   const host = location.host;
-  const install = `curl -fsSL ${ORIGIN}/install.sh | bash`;
-  const common = `
-    <li><div><h3>프로젝트 저장소에 훅 설치</h3>
-      <p>저장소 루트에서 실행하세요. <code>.claude/hooks/pixel-office.sh</code>, <code>.claude/settings.json</code> 훅, 6명의 팀원(서브에이전트)이 추가돼요.</p>
-      ${codeBlock(install)}
-      <p style="margin-top:6px">팀원에게 일을 나눠 맡기도록 CLAUDE.md에 안내까지 넣으려면:</p>
-      ${codeBlock(`${install} -s -- --team-guide`)}
-    </div></li>`;
   if (tab === "local")
-    return `<ol class="steps">${common}
-      <li><div><h3>사무실 주소를 환경 변수로</h3><p>셸 설정(~/.zshrc 등)에 추가하고 터미널을 다시 여세요.</p>${codeBlock(`export PIXEL_OFFICE_URL="${url}"`)}</div></li>
-      <li><div><h3>Claude Code 실행</h3><p>평소처럼 <code>claude</code>를 실행하면 이 화면에 바로 나타나요.</p></div></li>
+    return `<ol class="steps">
+      <li><div><h3>프로젝트 폴더에서 터미널 열기</h3><p>Claude Code로 작업하는 프로젝트 폴더에서 터미널을 열고, 아래 한 줄을 붙여넣은 뒤 Enter를 누르세요.</p>${codeBlock(install)}</div></li>
+      <li><div><h3>Claude Code 실행</h3><p>평소처럼 <code>claude</code>를 실행하고 일을 시키세요. 이 화면에 팀원들이 출근해요. 끝!</p></div></li>
     </ol>`;
-  return `<ol class="steps">${common}
-    <li><div><h3>설치한 파일을 커밋 & 푸시</h3><p>클라우드 세션은 저장소를 새로 받아 시작하므로 <code>.claude/</code> 변경사항이 저장소에 있어야 해요.</p>${codeBlock(`git add .claude CLAUDE.md 2>/dev/null; git commit -m "chore: add Pixel Office hooks" && git push`)}</div></li>
-    <li><div><h3>클라우드 환경에 주소 등록</h3>
-      <p>claude.ai/code → 세션 상단의 환경 메뉴 → <b>Edit</b> → <b>Environment variables</b>에 추가:</p>
-      ${codeBlock(`PIXEL_OFFICE_URL=${url}`)}
-      <p style="margin-top:8px">같은 화면의 <b>Network access</b>에서 이 서버 도메인을 허용하세요 (Limited/Custom → Allowed domains):</p>
+  return `<ol class="steps">
+    <li><div><h3>네트워크 허용하기 <small class="muted">(처음 한 번만)</small></h3>
+      <p><b>claude.ai/code</b>를 열고 → 화면 위쪽의 <b>환경 이름</b>을 누르고 → <b>Edit(편집)</b> → <b>Network access</b>에서 <b>Limited</b>(또는 Custom)를 고른 다음, <b>Allowed domains</b> 칸에 아래 주소를 붙여넣고 저장하세요.</p>
       ${codeBlock(host)}
-      <div class="note">주소에 사무실 키가 들어 있어요. 키를 아는 사람은 누구나 이 사무실을 볼 수 있으니 공개 저장소에는 커밋하지 마세요 — 환경 변수로만 넣으면 안전해요.</div>
+      <div class="note">이미 <b>Full</b>(전체 허용)로 되어 있다면 이 단계는 건너뛰어도 돼요.</div>
     </div></li>
-    <li><div><h3>새 세션 시작</h3><p>그 환경으로 새 세션을 열고 일을 시키면, 팀원들이 출근해서 일하는 모습이 실시간으로 보여요.</p></div></li>
-  </ol>`;
+    <li><div><h3>Claude에게 아래 문장 그대로 붙여넣기</h3>
+      <p>보고 싶은 프로젝트 저장소로 <b>새 세션</b>을 열고, 아래 내용을 통째로 복사해서 보내세요. Claude가 알아서 설치하고 저장소에 올려 줘요.</p>
+      ${codeBlock(claudePrompt(install))}
+    </div></li>
+    <li><div><h3>새 세션을 하나 더 열고 일 시키기</h3>
+      <p>설치는 <b>다음 세션부터</b> 적용돼요. 같은 저장소로 새 세션을 열고 평소처럼 일을 시키면 이 화면에 팀원들이 출근해요. 끝!</p>
+    </div></li>
+  </ol>
+  <div class="note" style="margin-top:16px">🔒 공개 저장소라면: 사무실 주소(키)가 저장소에 올라가요. 아무나 보면 안 된다면 2단계 문장 끝에 <code>-s -- --no-save</code>를 붙이고, 환경 설정의 <b>Environment variables</b>에 <code>PIXEL_OFFICE_URL=${esc(roomUrl)}</code>를 넣으세요.</div>`;
 }
 
 function openSetup(tab = "cloud") {
   const body = $("#setupBody");
-  const urlLine = roomUrl
-    ? `<p class="muted" style="margin-top:0">이 사무실 주소: <code>${esc(roomUrl)}</code></p>`
-    : `<p class="muted" style="margin-top:0">먼저 <b>내 사무실 만들기</b>로 개인 주소를 받으세요. 아래 &lt;내-사무실-키&gt; 자리에 들어가요.</p>`;
-  body.innerHTML = `${urlLine}
-    <div class="tabs"><button data-tab="cloud" class="${tab === "cloud" ? "on" : ""}">☁️ 클라우드 세션 (claude.ai/code)</button><button data-tab="local" class="${tab === "local" ? "on" : ""}">💻 내 컴퓨터</button></div>
+  if (!roomUrl) {
+    body.innerHTML = `<ol class="steps"><li><div><h3>먼저 내 사무실을 만드세요</h3><p>버튼을 누르면 나만의 사무실 주소가 생기고, 그 주소가 들어간 설치 안내가 바로 나와요.</p><button class="btn primary big" data-create>내 사무실 만들기 →</button></div></li></ol>`;
+  } else {
+    body.innerHTML = `<p class="muted" style="margin-top:0">내 사무실 주소 (즐겨찾기 해 두세요): <code>${esc(roomUrl)}</code></p>
+    <div class="tabs"><button data-tab="cloud" class="${tab === "cloud" ? "on" : ""}">☁️ claude.ai/code (클라우드)</button><button data-tab="local" class="${tab === "local" ? "on" : ""}">💻 내 컴퓨터 터미널</button></div>
     ${setupHtml(tab)}`;
+  }
   if (!$("#setup").open) $("#setup").showModal();
 }
 
 $("#setupBody").addEventListener("click", (e) => {
   const tab = e.target.closest("[data-tab]");
   if (tab) return openSetup(tab.dataset.tab);
+  if (e.target.closest("[data-create]")) return $("#btnCreate").click();
   const c = e.target.closest("[data-copy]");
   if (c) copy(c.dataset.copy);
 });

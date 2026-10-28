@@ -34,9 +34,9 @@ function skyMode(date) {
 }
 
 const SKY = {
-  day: { top: "#8ecdf2", bottom: "#d8f0fb", b1: "#9fb5c9", b2: "#7f97ae", win: "#d9ecf7", lit: 0.05 },
+  day: { top: "#8fd0f5", bottom: "#e2f4fc", b1: "#a9bfd6", b2: "#8aa3bd", win: "#d9ecf7", lit: 0.05 },
   sunset: { top: "#f59a7a", bottom: "#ffd6a1", b1: "#8f7d98", b2: "#6c5f7d", win: "#ffe3a6", lit: 0.35 },
-  night: { top: "#141b38", bottom: "#33335e", b1: "#2a2f4c", b2: "#1d2139", win: "#ffd77a", lit: 0.55 },
+  night: { top: "#1c2a4f", bottom: "#4a4f86", b1: "#33406a", b2: "#26304f", win: "#ffd77a", lit: 0.55 },
 };
 
 function drawBackground(ctx, mode) {
@@ -134,19 +134,37 @@ function drawBackground(ctx, mode) {
   } else {
     disc(ctx, wx + 120, wy + 70, 14, "#ffcf7a");
   }
+  // Pixel District town: pastel buildings with outlines, then a row of round trees
   const br = rng(11);
+  const facades = mode === "night" ? null : ["#f4e3c3", "#f6c9b4", "#c9def0", "#cfe6cf", "#e9d5f0", "#fbf3e4"];
   for (let layer = 0; layer < 2; layer++) {
     let x = wx - 6;
     while (x < wx + ww) {
-      const bw = 14 + Math.floor(br() * 22);
-      const bh = (layer ? 26 : 40) + Math.floor(br() * (layer ? 26 : 34));
-      const c = layer ? sky.b2 : sky.b1;
-      const top = wy + wh - bh;
-      R(ctx, Math.max(wx, x), top, Math.min(bw, wx + ww - Math.max(wx, x)), bh, c);
-      for (let yy = top + 4; yy < wy + wh - 4; yy += 6)
-        for (let xx = x + 3; xx < x + bw - 3; xx += 5) if (xx > wx && xx < wx + ww - 2 && br() < (layer ? sky.lit : sky.lit * 0.6) + 0.04) R(ctx, xx, yy, 2, 3, sky.win);
+      const bw = 16 + Math.floor(br() * 20);
+      const bh = (layer ? 22 : 40) + Math.floor(br() * (layer ? 22 : 30));
+      const top = wy + wh - bh - 8;
+      const x0 = Math.max(wx, x);
+      const w0 = Math.min(bw, wx + ww - x0);
+      const c = facades ? (layer ? facades[Math.floor(br() * facades.length)] : mix(sky.b1, "#ffffff", 0.35)) : layer ? sky.b2 : sky.b1;
+      if (w0 > 0) {
+        R(ctx, x0, top, w0, bh + 8, facades && layer ? "#5a6b86" : c);
+        R(ctx, x0 + 1, top + 1, Math.max(0, w0 - 2), bh + 8, c);
+        if (facades && layer) R(ctx, x0, top - 3, w0, 3, ["#d9735b", "#4d7fb3", "#6aa36f"][Math.floor(br() * 3)]);
+      }
+      for (let yy = top + 4; yy < wy + wh - 10; yy += 6)
+        for (let xx = x + 3; xx < x + bw - 3; xx += 5)
+          if (xx > wx && xx < wx + ww - 2) {
+            if (facades && layer) R(ctx, xx, yy, 2, 3, br() < 0.8 ? "#7fb3dc" : "#ffffff");
+            else if (br() < (layer ? sky.lit : sky.lit * 0.6) + 0.04) R(ctx, xx, yy, 2, 3, sky.win);
+          }
       x += bw + (layer ? 2 : 6);
     }
+  }
+  const treeC = mode === "night" ? ["#1f3a3a", "#2a4d47"] : ["#4fa65f", "#7cc77a"];
+  for (let x = wx + 4; x < wx + ww; x += 13) {
+    const r = 6 + Math.floor(br() * 3);
+    ellipse(ctx, x, wy + wh - 6, r, r - 1, treeC[0]);
+    ellipse(ctx, x - 1, wy + wh - 8, r - 3, r - 4, treeC[1]);
   }
   // frame + mullions
   ctx.strokeStyle = PAL.metal;
@@ -377,21 +395,19 @@ export class OfficeScene {
   }
 
   drawWall(ctx, o, now) {
-    // neon sign over the coffee bar
-    const flick = Math.floor(now / 80) % 97 === 0 ? 0.4 : 1;
+    // Pixel District style signboard over the coffee bar
+    box(ctx, 92, 18, 116, 24, PAL.ink, PAL.ink, 2);
+    R(ctx, 100, 30, 3, 6, PAL.white);
+    R(ctx, 104, 25, 3, 11, PAL.white);
+    R(ctx, 108, 28, 3, 8, PAL.white);
     ctx.font = FONT_B;
     ctx.textBaseline = "top";
-    ctx.save();
-    ctx.globalAlpha = flick;
-    ctx.shadowColor = PAL.neon;
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = "#ffd1e6";
-    ctx.fillText("CLAUDE & CO.", 104, 26);
-    ctx.restore();
-    ctx.fillStyle = PAL.neon;
-    ctx.globalAlpha = 0.9 * flick;
-    ctx.fillText("CLAUDE & CO.", 104, 26);
-    ctx.globalAlpha = 1;
+    ctx.fillStyle = PAL.white;
+    ctx.fillText("PIXEL OFFICE", 116, 24);
+    const blink = Math.floor(now / 700) % 2;
+    disc(ctx, 203, 23, 2, blink ? PAL.gold : "#7a6a3a");
+    R(ctx, 120, 11, 1, 7, PAL.metal);
+    R(ctx, 180, 11, 1, 7, PAL.metal);
 
     // espresso machine on the counter
     box(ctx, 96, 84, 34, 24, "#c9ccd2", PAL.ink);
@@ -509,14 +525,15 @@ export class OfficeScene {
   }
 
   namePlate(ctx, d, x, y) {
+    // navy label like the Pixel District map tags, with the role colour as a dot
     ctx.font = FONT_B;
     ctx.textBaseline = "top";
     const label = d.key === "lead" ? `${d.en} · ${d.name}` : `${d.name} · ${d.en}`;
-    const w = Math.ceil(ctx.measureText(label).width) + 14;
-    box(ctx, x - w / 2, y - 1, w, 16, d.color, PAL.ink);
-    R(ctx, x - w / 2 + 1, y + 13, w - 2, 1, "rgba(0,0,0,0.18)");
-    ctx.fillStyle = "#1b1a22";
-    ctx.fillText(label, Math.round(x - w / 2 + 7), y + 1);
+    const w = Math.ceil(ctx.measureText(label).width) + 22;
+    box(ctx, x - w / 2, y - 1, w, 16, PAL.ink, PAL.ink, 2);
+    disc(ctx, Math.round(x - w / 2 + 8), y + 7, 3, d.color);
+    ctx.fillStyle = PAL.white;
+    ctx.fillText(label, Math.round(x - w / 2 + 15), y + 1);
   }
 
   statusPill(ctx, d, look, g) {
@@ -527,9 +544,9 @@ export class OfficeScene {
     const w = Math.ceil(ctx.measureText(text).width) + 20;
     const x = Math.round(g.cx - w / 2);
     const y = g.gy + 4;
-    box(ctx, x, y, w, 15, "rgba(255,255,255,0.92)", "rgba(35,32,42,0.35)");
+    box(ctx, x, y, w, 15, "rgba(255,255,255,0.92)", "rgba(31,43,64,0.3)");
     disc(ctx, x + 7, y + 7, 2, tone);
-    ctx.fillStyle = "#3a3744";
+    ctx.fillStyle = PAL.ink;
     ctx.fillText(text, x + 13, y + 1);
   }
 
@@ -554,7 +571,7 @@ export class OfficeScene {
     ctx.globalAlpha = age > life - 600 ? Math.max(0, (life - age) / 600) : 1;
     const border = b.kind === "error" ? "#ef4444" : b.kind === "notify" ? "#f59e0b" : b.kind === "done" ? "#22c55e" : PAL.ink;
     const yy = y + Math.round((1 - pop) * 4);
-    R(ctx, x + 2, yy + 2, w, h, "rgba(35,32,42,0.18)");
+    R(ctx, x + 2, yy + 2, w, h, "rgba(31,43,64,0.16)");
     box(ctx, x, yy, w, h, "#ffffff", border);
     R(ctx, x + 1, yy + 1, 3, h - 2, d.color);
     // tail
@@ -569,7 +586,7 @@ export class OfficeScene {
     R(ctx, tx + 1, yy + h + 4, 1, 2, border);
     R(ctx, tx + 4, yy + h + 4, 1, 2, border);
     R(ctx, tx + 2, yy + h + 5, 2, 1, border);
-    ctx.fillStyle = "#24212b";
+    ctx.fillStyle = PAL.ink;
     lines.forEach((l, i) => ctx.fillText(l, x + 8, yy + 4 + i * 14));
     ctx.globalAlpha = 1;
   }
@@ -607,12 +624,12 @@ export class OfficeScene {
       draw: () => {
         const x = 692;
         const y = 478;
-        box(ctx, x, y, 148, 30, "#4f7f7a", PAL.ink, 2); // back
-        for (let i = 0; i < 3; i++) box(ctx, x + 8 + i * 44, y + 6, 44, 20, "#5f948e", "#3d6460");
-        box(ctx, x - 6, y + 22, 160, 30, "#5f948e", PAL.ink, 2); // seat
-        R(ctx, x - 5, y + 23, 158, 3, "#78aea7");
-        box(ctx, x - 12, y + 14, 14, 38, "#4f7f7a", PAL.ink); // arms
-        box(ctx, x + 146, y + 14, 14, 38, "#4f7f7a", PAL.ink);
+        box(ctx, x, y, 148, 30, PAL.navy, PAL.ink, 2); // back
+        for (let i = 0; i < 3; i++) box(ctx, x + 8 + i * 44, y + 6, 44, 20, "#3d6283", "#2a4a66");
+        box(ctx, x - 6, y + 22, 160, 30, "#3d6283", PAL.ink, 2); // seat
+        R(ctx, x - 5, y + 23, 158, 3, "#5a83a6");
+        box(ctx, x - 12, y + 14, 14, 38, PAL.navy, PAL.ink); // arms
+        box(ctx, x + 146, y + 14, 14, 38, PAL.navy, PAL.ink);
         R(ctx, x, y + 52, 4, 4, PAL.metal);
         R(ctx, x + 144, y + 52, 4, 4, PAL.metal);
         box(ctx, x + 16, y + 12, 22, 16, PAL.terracotta, PAL.terracottaDark); // cushions

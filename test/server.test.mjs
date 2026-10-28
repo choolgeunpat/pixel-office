@@ -102,3 +102,22 @@ test("installer adds hooks idempotently and uninstalls cleanly", () => {
   assert.ok(!fs.existsSync(path.join(dir, ".claude/hooks/pixel-office.sh")));
   assert.doesNotMatch(fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8"), /pixel-office/);
 });
+
+test("per-room installer has the room address built in and saves it for the hook", async () => {
+  const res = await fetch(`${url}/r/${KEY}/install.sh`, { headers: { "x-forwarded-proto": "https", "x-forwarded-host": "office.example.com" } });
+  const body = await res.text();
+  assert.match(body, new RegExp(`ROOM_URL='https://office.example.com/r/${KEY}'`));
+  assert.equal((await fetch(`${url}/r/${KEY}/install.sh`, { headers: { "x-forwarded-host": "evil.com'$(id)" } })).status, 400);
+
+  // install from the served script, then the hook finds the room via .claude/pixel-office.url
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "po-"));
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  const local = (await (await fetch(`${url}/r/hookroom2_abcdefgh/install.sh`)).text());
+  fs.writeFileSync(path.join(dir, "i.sh"), local);
+  const env = { ...process.env, PIXEL_OFFICE_URL: "" };
+  await new Promise((resolve, reject) => import("node:child_process").then(({ execFile }) => execFile("bash", ["i.sh"], { cwd: dir, env }, (e) => (e ? reject(e) : resolve()))));
+  assert.equal(fs.readFileSync(path.join(dir, ".claude/pixel-office.url"), "utf8").trim(), `${url}/r/hookroom2_abcdefgh`);
+  assert.match(fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8"), /pixel-office:team/);
+  const list = await (await fetch(`${url}/api/r/hookroom2_abcdefgh/events`)).json();
+  assert.equal(list.events[0].session, "install-check");
+});

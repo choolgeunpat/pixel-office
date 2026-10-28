@@ -1,13 +1,22 @@
 #!/usr/bin/env bash
 # Pixel Office hook — forwards Claude Code hook events to your Pixel Office room.
 #
-# Reads the hook JSON on stdin and POSTs it to $PIXEL_OFFICE_URL (your room page,
-# e.g. https://office.example.com/r/abc123…). Without that variable it does nothing.
+# Reads the hook JSON on stdin and POSTs it to your room page (e.g.
+# https://office.example.com/r/abc123…), taken from $PIXEL_OFFICE_URL or, if that is
+# unset, from .claude/pixel-office.url. Without either it does nothing.
 # It never blocks or fails Claude: every error is swallowed and it always exits 0.
 # Large fields (tool output, file contents) are dropped before sending when node is available;
 # the server clips everything again and never stores raw payloads.
 
 url="${PIXEL_OFFICE_URL:-}"
+if [ -z "$url" ]; then
+  for f in "${CLAUDE_PROJECT_DIR:-.}/.claude/pixel-office.url" "$(dirname "$0")/../pixel-office.url"; do
+    if [ -f "$f" ]; then
+      url="$(head -n 1 "$f" | tr -d '[:space:]')"
+      break
+    fi
+  done
+fi
 if [ -z "$url" ]; then
   cat >/dev/null
   exit 0

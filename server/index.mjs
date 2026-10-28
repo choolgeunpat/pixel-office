@@ -7,6 +7,7 @@
  *   GET  /api/r/:key/events   JSON list (?since=<id>), for polling clients
  *   DELETE /api/r/:key        clear a room
  *   GET  /install.sh          the installer kit (kit/install.sh)
+ *   GET  /r/:key/install.sh   the installer with that room's address built in
  *   GET  /r/:key, /, /demo    the office (public/index.html)
  *
  * Env: PORT (8787), HOST (0.0.0.0), DATA_DIR (optional persistence),
@@ -129,8 +130,19 @@ async function handle(req, res, store) {
 
   if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, { error: "method not allowed" });
 
-  // installer kit
+  // installer kit; /r/:key/install.sh has that room's address built in
   if (p === "/install.sh") return serveFile(res, path.join(ROOT, "kit", "install.sh"), req.method);
+  const inst = p.match(/^\/r\/([^/]+)\/install\.sh$/);
+  if (inst) {
+    if (!KEY_RE.test(inst[1])) return send(res, 400, { error: "bad room key" });
+    const proto = String(req.headers["x-forwarded-proto"] || "http").split(",")[0].trim();
+    const host = String(req.headers["x-forwarded-host"] || req.headers.host || "localhost").split(",")[0].trim();
+    const room = `${proto}://${host}/r/${inst[1]}`;
+    if (!/^https?:\/\/[A-Za-z0-9.:[\]-]+\/r\/[A-Za-z0-9_-]+$/.test(room)) return send(res, 400, { error: "bad host" });
+    const body = fs.readFileSync(path.join(ROOT, "kit", "install.sh"), "utf8").replace("'__PRESET_URL__'", `'${room}'`);
+    res.writeHead(200, { "content-type": TYPES[".sh"], "cache-control": "no-cache" });
+    return res.end(req.method === "HEAD" ? undefined : body);
+  }
 
   // SPA routes
   if (p === "/" || p === "/demo" || /^\/r\/[^/]+\/?$/.test(p)) return serveFile(res, path.join(PUBLIC, "index.html"), req.method);

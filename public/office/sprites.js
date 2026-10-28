@@ -164,16 +164,21 @@ export class Character {
     const H = meta.frameHeight - clipBottom;
     if (H <= 0) return;
     const sx = fi * (W + meta.padding);
-    const dx = Math.round(x - meta.anchor.x);
-    const dy = Math.round(y - meta.anchor.y);
+    // snap to device pixels so the sprite's pixels stay hard-edged at any scale
+    const k = ctx.getTransform().a || 1;
+    const sn = (v) => Math.round(v * k) / k;
+    const dx = sn(x - meta.anchor.x);
+    const dy = sn(y - meta.anchor.y);
+    const dw = Math.round(W * k) / k;
+    const dh = Math.round(H * k) / k;
     ctx.save();
     ctx.globalAlpha = alpha;
     if (dir === "left") {
-      ctx.translate(dx + W, dy);
+      ctx.translate(dx + dw, dy);
       ctx.scale(-1, 1);
-      ctx.drawImage(sheet, sx, 0, W, H, 0, 0, W, H);
+      ctx.drawImage(sheet, sx, 0, W, H, 0, 0, dw, dh);
     } else {
-      ctx.drawImage(sheet, sx, 0, W, H, dx, dy, W, H);
+      ctx.drawImage(sheet, sx, 0, W, H, dx, dy, dw, dh);
     }
     ctx.restore();
   }

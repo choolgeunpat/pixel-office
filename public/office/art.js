@@ -42,9 +42,19 @@ export const PAL = {
   shadow: "rgba(31,43,64,0.13)",
 };
 
+/** device pixels per world pixel of the context being drawn to; shapes snap to device pixels so edges stay hard */
+let SNAP = 1;
+export function setSnap(s) {
+  SNAP = s;
+}
+
 export function R(ctx, x, y, w, h, c) {
   ctx.fillStyle = c;
-  ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+  const x0 = Math.round(x * SNAP) / SNAP;
+  const y0 = Math.round(y * SNAP) / SNAP;
+  const x1 = Math.round((x + w) * SNAP) / SNAP;
+  const y1 = Math.round((y + h) * SNAP) / SNAP;
+  ctx.fillRect(x0, y0, Math.max(x1 - x0, 1 / SNAP), Math.max(y1 - y0, 1 / SNAP));
 }
 
 /** rect with 1px outline and a 1px rounded corner cut */
@@ -59,7 +69,7 @@ export function disc(ctx, cx, cy, r, c) {
   ctx.fillStyle = c;
   for (let y = -r; y <= r; y++) {
     const w = Math.round(Math.sqrt(r * r - y * y + r * 0.6));
-    ctx.fillRect(Math.round(cx - w), Math.round(cy + y), w * 2, 1);
+    R(ctx, cx - w, cy + y, w * 2, 1, c);
   }
 }
 
@@ -67,7 +77,7 @@ export function ellipse(ctx, cx, cy, rx, ry, c) {
   ctx.fillStyle = c;
   for (let y = -ry; y <= ry; y++) {
     const w = Math.round(rx * Math.sqrt(1 - (y * y) / (ry * ry + 0.01)));
-    ctx.fillRect(Math.round(cx - w), Math.round(cy + y), w * 2, 1);
+    R(ctx, cx - w, cy + y, w * 2, 1, c);
   }
 }
 
@@ -218,8 +228,7 @@ export function desk(ctx, g, opts) {
   const { color, screen, screen2, t = 0, accessories = 0, busy = false } = opts;
   const half = w / 2;
   // floor shadow
-  ctx.fillStyle = PAL.shadow;
-  ctx.fillRect(cx - half - 2, gy - 4, w + 4, 6);
+  R(ctx, cx - half - 2, gy - 4, w + 4, 6, PAL.shadow);
   // legs (slim navy frame)
   R(ctx, cx - half + 6, g.front, 4, gy - g.front, PAL.metal);
   R(ctx, cx + half - 10, g.front, 4, gy - g.front, PAL.metal);

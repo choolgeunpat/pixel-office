@@ -1,22 +1,22 @@
 {
-  "frameWidth": 48,
-  "frameHeight": 40,
+  "frameWidth": 56,
+  "frameHeight": 56,
   "anchor": {
-    "x": 24,
-    "y": 38
+    "x": 28,
+    "y": 54
   },
-  "facing": "right",
+  "facing": "front",
   "animations": {
     "sit": {
       "row": 0,
-      "frames": 4,
-      "fps": 2.5,
+      "frames": 12,
+      "fps": 4,
       "loop": true
     },
     "wash": {
       "row": 1,
-      "frames": 2,
-      "fps": 1.5,
+      "frames": 4,
+      "fps": 4,
       "loop": true
     },
     "sleep": {
@@ -28,7 +28,7 @@
     "stretch": {
       "row": 3,
       "frames": 5,
-      "fps": 4,
+      "fps": 3,
       "loop": false
     },
     "jump": {
@@ -40,13 +40,13 @@
     "walk": {
       "row": 5,
       "frames": 4,
-      "fps": 9,
+      "fps": 7,
       "loop": true
     },
     "walkfront": {
-      "row": 6,
-      "frames": 2,
-      "fps": 6,
+      "row": 5,
+      "frames": 4,
+      "fps": 7,
       "loop": true
     }
   },

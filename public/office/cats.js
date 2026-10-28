@@ -265,9 +265,11 @@ export class Cats {
     }
   }
 
-  /** @returns {{y:number, draw:Function}[]} drawables; a cat pixel is a whole number of device pixels, ~1.5 world px */
+  /** @returns {{y:number, draw:Function}[]} drawables. One cat pixel = a whole number of device pixels (~0.85 world px) */
   items(ctx, now, S) {
-    const sc = Math.max(1, Math.round(1.5 * S)) / S;
+    const p = Math.max(1, Math.round(S * 0.85));
+    const sc = p / S;
+    const snap = (v) => Math.round(v * S) / S;
     return this.cats.map((c) => ({
       y: c.sort,
       draw: () => {
@@ -278,18 +280,16 @@ export class Cats {
         if (c.state === "hop" || c.state === "hop-out") f = (c.arc || 0) > 9 ? 1 : 0;
         const fw = CAT_META.frameWidth;
         const fh = CAT_META.frameHeight;
-        const ax = CAT_META.anchor.x;
-        const ay = CAT_META.anchor.y;
         const lift = c.arc || 0;
         // soft shadow on the ground
         ctx.fillStyle = "rgba(60,40,20,0.16)";
         ctx.beginPath();
-        ctx.ellipse(c.x, c.y, 11 * sc, 2.8 * sc, 0, 0, Math.PI * 2);
+        ctx.ellipse(c.x, c.y, 15 * sc, 3.4 * sc, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.save();
-        ctx.translate(Math.round(c.x * S) / S, Math.round((c.y - lift) * S) / S);
+        ctx.translate(snap(c.x), snap(c.y - lift));
         if (c.dir < 0) ctx.scale(-1, 1);
-        ctx.drawImage(sheets[c.id], f * fw, meta.row * fh, fw, fh, -ax * sc, -ay * sc, fw * sc, fh * sc);
+        ctx.drawImage(sheets[c.id], f * fw, meta.row * fh, fw, fh, -CAT_META.anchor.x * sc, -CAT_META.anchor.y * sc, fw * sc, fh * sc);
         ctx.restore();
       },
     }));

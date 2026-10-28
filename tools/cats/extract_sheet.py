@@ -1,259 +1,198 @@
 #!/usr/bin/env python3 -I
 """
-Cut the office cats out of the reference sheet (docs/design/cats/reference-cats.webp).
+Office cat sprite sheets from docs/design/cats/reference-cats.webp.
 
-The sheet shows five cats (Grey & White, Black, White & Grey Tabby, Cream, Calico), each with
-rows idle / walk (front) / run (side) / sit / jump / fishing…. We use the first five rows:
-  1. the panel colour is keyed out by a flood fill from the border (the dark pixel outline
-     keeps the white fur safe), frames are found as connected blobs in each row band,
-  2. every frame is placed on a shared 48×40 canvas, feet on the same line,
-  3. colours are snapped to a small palette per cat, so the soft source gets a crisp pixel look.
-Extra poses the sheet lacks (sleep, stretch, wash) are derived from these frames.
+The sheet's small frames are blurry, so every animation is built from the crisp portrait sprite
+(`portraits.crisp`, ~41×46 hard pixels): tail wag and blinking by moving a few pixels, a waddle
+walk by shearing/bobbing whole rows (no resampling, so edges stay sharp), and squash/stretch poses
+by area-averaging and then snapping back to the cat's own palette with a fresh 1 px outline.
 
 Run from the repo root:  python3 -I tools/cats/extract_sheet.py
+Output: public/assets/cats/<breed>.png + metadata.json, tools/cats/preview.png
 """
-import json, os
-from collections import deque
+import json, os, sys
 import numpy as np
 from PIL import Image
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-SRC = os.path.join(ROOT, "docs", "design", "cats", "reference-cats.webp")
+sys.path.insert(0, os.path.dirname(__file__))
+import portraits  # noqa: E402
+
+ROOT = portraits.ROOT
 OUT = os.path.join(ROOT, "public", "assets", "cats")
-FW, FH = 48, 40
-ANCHOR = (24, 38)  # feet
-
-# column panels of the sheet (x0, x1) and the cat each one shows
-COLUMNS = [
-    ("mochi", "모찌", 12, 306),
-    ("midnight", "까망", 320, 613),
-    ("cloud", "구름", 628, 911),
-    ("cream", "크림", 925, 1218),
-    ("calico", "미미", 1232, 1525),
-]
-ROWS = ["idle", "walk", "run", "sit", "jump"]  # the first five bands under the portrait
-LABEL_W = 95                                    # the row labels take the left part of each panel
+FW, FH = 56, 56
+ANCHOR = (28, 54)  # feet
+NAMES = {"mochi": "모찌", "midnight": "까망", "cloud": "구름", "cream": "크림", "calico": "미미"}
 
 
-def border_colour(a):
-    edge = np.concatenate([a[0], a[-1], a[:, 0], a[:, -1]])
-    return np.median(edge, axis=0)
+def palette_of(a):
+    px = a[a[..., 3] > 0][:, :3]
+    return np.unique(px, axis=0)
 
 
-def outside_mask(a, bg, tol=34):
-    """flood fill from the border through pixels that look like the panel (or white halo)"""
-    h, w, _ = a.shape
-    d = np.sqrt(((a.astype(float) - bg) ** 2).sum(axis=2))
-    bright = a.min(axis=2)
-    likely = (d < tol) | ((bright > 226) & (d < 60))
-    out = np.zeros((h, w), bool)
-    q = deque()
-    for x in range(w):
-        for y in (0, h - 1):
-            if likely[y, x] and not out[y, x]:
-                out[y, x] = True; q.append((y, x))
-    for y in range(h):
-        for x in (0, w - 1):
-            if likely[y, x] and not out[y, x]:
-                out[y, x] = True; q.append((y, x))
-    while q:
-        y, x = q.popleft()
-        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            ny, nx = y + dy, x + dx
-            if 0 <= ny < h and 0 <= nx < w and likely[ny, nx] and not out[ny, nx]:
-                out[ny, nx] = True; q.append((ny, nx))
-    return out
-
-
-def runs(profile, min_len, gap):
-    """[(start, end)] of consecutive True entries, merging gaps shorter than `gap`"""
-    res, start, last = [], None, None
-    for i, v in enumerate(profile):
-        if v:
-            if start is None: start = i
-            last = i
-        elif start is not None and i - last > gap:
-            if last - start + 1 >= min_len: res.append((start, last + 1))
-            start = None
-    if start is not None and last - start + 1 >= min_len: res.append((start, last + 1))
-    return res
-
-
-def components(mask):
-    h, w = mask.shape
-    seen = np.zeros_like(mask, bool)
-    comps = []
+def snap_outline(rgb, solid, pal):
+    """snap colours to `pal` and give edge pixels the darkest colour around them"""
+    h, w = solid.shape
+    flat = rgb.reshape(-1, 3).astype(float)
+    d = ((flat[:, None, :] - pal[None, :, :].astype(float)) ** 2).sum(axis=2)
+    out = pal[d.argmin(axis=1)].reshape(h, w, 3).copy()
+    lum = out.astype(float) @ np.array([0.3, 0.59, 0.11])
+    res = out.copy()
     for y in range(h):
         for x in range(w):
-            if mask[y, x] and not seen[y, x]:
-                q = deque([(y, x)]); seen[y, x] = True; pts = []
-                while q:
-                    cy, cx = q.popleft(); pts.append((cy, cx))
-                    for dy in (-1, 0, 1):
-                        for dx in (-1, 0, 1):
-                            ny, nx = cy + dy, cx + dx
-                            if 0 <= ny < h and 0 <= nx < w and mask[ny, nx] and not seen[ny, nx]:
-                                seen[ny, nx] = True; q.append((ny, nx))
-                comps.append(pts)
-    return comps
+            if not solid[y, x]: continue
+            if any(not (0 <= y + dy < h and 0 <= x + dx < w and solid[y + dy, x + dx]) for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                best, bl = out[y, x], 1e9
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        yy, xx = y + dy, x + dx
+                        if 0 <= yy < h and 0 <= xx < w and solid[yy, xx] and lum[yy, xx] < bl:
+                            best, bl = out[yy, xx], lum[yy, xx]
+                res[y, x] = best
+    return np.dstack([res, (solid * 255).astype(np.uint8)])
 
 
-def cut_column(img, name, x0, x1, y0=268, y1=735):
-    a = np.asarray(img.crop((x0 + LABEL_W, y0, x1, y1)).convert("RGB"))
-    bg = border_colour(a)
-    out = outside_mask(a, bg)
-    fg = ~out
-    # drop thin debris (anti-aliasing specks)
-    rows = runs(fg.sum(axis=1) > 2, 14, 3)[: len(ROWS)]
-    frames = {}
-    for rname, (ra, rb) in zip(ROWS, rows):
-        band = fg[ra:rb]
-        cols = runs(band.sum(axis=0) > 0, 8, 2)
-        lst = []
-        for ca, cb in cols:
-            sub = band[:, ca:cb]
-            # keep the biggest blob in this column span (a stray speck is not a frame)
-            comps = components(sub)
-            if not comps: continue
-            big = max(comps, key=len)
-            if len(big) < 120: continue
-            m = np.zeros_like(sub)
-            for (yy, xx) in big: m[yy, xx] = True
-            # fill holes: anything not reachable from the border inside the blob's box
-            ys, xs = np.where(m)
-            ya, yb, xa, xb = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
-            box = m[ya:yb, xa:xb]
-            rgb = a[ra:rb, ca:cb][ya:yb, xa:xb]
-            lst.append((rgb.copy(), box.copy()))
-        frames[rname] = lst
-    return frames
+def resample(a, w2, h2, pal):
+    """area-average to a new size, then back to the cat's palette (stays hard-edged)"""
+    h, w = a.shape[:2]
+    pm = Image.fromarray(np.dstack([a[..., :3] * (a[..., 3:] > 0), a[..., 3]]).astype(np.uint8), "RGBA").resize((w2, h2), Image.BOX)
+    p = np.asarray(pm).astype(float)
+    alpha = p[..., 3] / 255
+    rgb = np.where(alpha[..., None] > 0, p[..., :3] / np.maximum(alpha[..., None], 1e-6), 0)
+    return snap_outline(rgb, alpha >= 0.5, pal)
 
 
-def split_wide(frames, limit=60):
-    """a blob that is two frames stuck together (the black cat's jump row) is cut at its thinnest column"""
-    out = []
-    for rgb, m in frames:
-        if m.shape[1] <= limit:
-            out.append((rgb, m)); continue
-        w = m.shape[1]
-        lo, hi = int(w * 0.35), int(w * 0.65)
-        cut = lo + int(np.argmin(m[:, lo:hi].sum(axis=0)))
-        for a, b in ((0, cut), (cut, w)):
-            mm = m[:, a:b]
-            ys, xs = np.where(mm)
-            if len(ys) < 120: continue
-            out.append((rgb[ys.min():ys.max() + 1, a + xs.min():a + xs.max() + 1], mm[ys.min():ys.max() + 1, xs.min():xs.max() + 1]))
+def shear_bob(a, shear, bob):
+    """lean the top of the sprite sideways row by row and lift it: a waddle step, no resampling"""
+    h, w = a.shape[:2]
+    out = np.zeros((h + 4, w + 4, 4), np.uint8)
+    for y in range(h):
+        s = int(round(shear * (1 - y / h)))
+        ny = y + 4 - bob
+        if 0 <= ny < out.shape[0]:
+            xs = np.arange(w) + 2 + s
+            ok = (xs >= 0) & (xs < out.shape[1])
+            out[ny, xs[ok]] = a[y, ok]
     return out
 
 
-def to_rgba(rgb, m):
-    img = np.dstack([rgb, (m * 255).astype(np.uint8)])
-    return Image.fromarray(img, "RGBA")
-
-
-def centroid_x(im):
-    a = np.asarray(im)[..., 3] > 0
-    xs = np.where(a)[1]
-    return float(xs.mean())
-
-
-def place(im, canvas, ox=0):
-    """feet on the anchor line, body centre on the anchor column"""
-    cx = centroid_x(im)
-    x = int(round(ANCHOR[0] - cx))
-    y = ANCHOR[1] - im.height
-    canvas.alpha_composite(im, (ox + max(0, x), max(0, y)))
-
-
-def eyes_closed(im):
-    """paint over the eyes with the fur around them and draw a short dark line: for the sleeping pose"""
-    a = np.array(im)
+def wag(a, dy):
+    """move the tail (lower left) up or down by dy pixels"""
     h, w = a.shape[:2]
+    out = a.copy()
+    region = (slice(int(h * 0.42), h), slice(0, int(w * 0.2)))
+    tail = a[region].copy()
+    out[region] = 0
+    ys0 = int(h * 0.42) + dy
+    for y in range(tail.shape[0]):
+        yy = ys0 + y
+        if 0 <= yy < h:
+            m = tail[y, :, 3] > 0
+            out[yy, 0:tail.shape[1]][m] = tail[y][m]
+    return out
+
+
+# eye boxes (x0, x1, y0, y1; end exclusive) of the two eyes in each breed's crisp 41×46 sprite
+EYE_BOXES = {
+    "mochi": [(20, 24, 13, 18), (31, 35, 13, 18)],
+    "midnight": [(18, 24, 14, 19), (30, 36, 14, 19)],
+    "cloud": [(19, 24, 14, 19), (30, 35, 14, 19)],
+    "cream": [(18, 23, 14, 19), (30, 35, 14, 19)],
+    "calico": [(19, 24, 14, 19), (31, 36, 14, 19)],
+}
+
+
+def close_eyes(a, key):
+    """paint the eyes over with the fur around them and draw a short dark line: a blink / sleeping eyes"""
+    out = a.copy()
     alpha = a[..., 3] > 0
-    ys, xs = np.where(alpha)
-    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
-    H, Wd = y1 - y0, x1 - x0
     lum = a[..., :3].astype(float) @ np.array([0.3, 0.59, 0.11])
-    region = np.zeros_like(alpha)
-    region[y0 + int(H * 0.28): y0 + int(H * 0.62), x0 + int(Wd * 0.22): x0 + int(Wd * 0.78)] = True
-    region &= alpha
-    r, g, b = a[..., 0].astype(int), a[..., 1].astype(int), a[..., 2].astype(int)
-    green = (g > r + 22) & (g > b + 22)
-    fur = np.median(lum[region])
-    eye = region & (green | (lum < fur - 55))
-    # eye blobs: the two biggest components on the left and right of the head's middle
-    comps = [c for c in components(eye) if len(c) >= 2]
-    comps.sort(key=len, reverse=True)
-    mid = x0 + Wd / 2
-    picks = []
-    for side in (-1, 1):
-        cand = [c for c in comps if (np.mean([p[1] for p in c]) - mid) * side > 1]
-        if cand: picks.append(cand[0])
-    line_col = np.array([40, 34, 48, 255], np.uint8)
-    for c in picks:
-        py = [p[0] for p in c]; px = [p[1] for p in c]
-        top, bot, left, right = min(py), max(py), min(px), max(px)
-        # fur colour above the eye
-        samp = [a[yy, xx, :3] for yy in range(max(0, top - 3), top) for xx in range(left, right + 1) if alpha[yy, xx] and not eye[yy, xx]]
-        col = np.median(samp, axis=0) if samp else np.array([200, 190, 180])
-        for (yy, xx) in c:
-            a[yy, xx, :3] = col
-        for xx in range(left - 1, right + 2):
-            if 0 <= xx < w and alpha[bot, xx]: a[bot, xx] = line_col
-    return Image.fromarray(a, "RGBA")
+    line = np.array([46, 38, 52, 255], np.uint8)
+    for (x0, x1, y0, y1) in EYE_BOXES[key]:
+        ex = (slice(max(0, y0 - 1), y1 + 1), slice(max(0, x0 - 1), x1 + 1))
+        px = a[ex][..., :3].reshape(-1, 3)
+        l = lum[ex].reshape(-1)
+        light = px[l >= np.percentile(l, 55)]
+        col = np.median(light, axis=0).astype(np.uint8)
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                if alpha[y, x]: out[y, x, :3] = col
+        ly = y0 + (y1 - y0) // 2 + 1
+        for x in range(x0, x1 - 1):
+            out[ly, x] = line
+    return out
 
 
-def squash(im, sx, sy):
-    w, h = im.size
-    return im.resize((max(1, round(w * sx)), max(1, round(h * sy))), Image.NEAREST)
+def head_tilt(a, k):
+    """lean the head (upper rows) sideways: nuzzling / grooming"""
+    h, w = a.shape[:2]
+    out = np.zeros_like(a)
+    cut = int(h * 0.6)
+    for y in range(h):
+        s = int(round(k * max(0, (cut - y)) / cut)) if y < cut else 0
+        if s >= 0:
+            out[y, s:] = a[y, : w - s] if s else a[y]
+        else:
+            out[y, :s] = a[y, -s:]
+    return out
 
 
-def build_breed(frames):
-    sit = [to_rgba(*f) for f in frames["sit"][:3]]
-    run = [to_rgba(*f) for f in split_wide(frames["run"])[:4]]
-    walkf = [to_rgba(*f) for f in frames["walk"][:2]]
-    jump = [to_rgba(*f) for f in split_wide(frames["jump"])[:2]]
-    sleep0 = squash(eyes_closed(sit[0]), 1.12, 0.64)
-    sleep1 = squash(eyes_closed(sit[0]), 1.12, 0.68)
-    anims = {  # name: (frames, fps, loop)
-        # the third sit frame of some cats is a differently coloured variant in the sheet: not used
-        "sit": ([sit[0], sit[1], sit[0], sit[1]], 2.5, True),
-        "wash": ([sit[0], sit[1]], 1.5, True),
-        "sleep": ([sleep0, sleep1], 1.2, True),
-        "stretch": ([sit[0], jump[0], jump[1], jump[1], jump[0]], 4, False),
-        "jump": (jump, 2, False),
-        "walk": (run, 9, True),
-        "walkfront": (walkf, 6, True),
+def cell(a):
+    """place a sprite on the shared canvas: bbox centre on the anchor column, bottom on the feet line"""
+    ys, xs = np.where(a[..., 3] > 0)
+    box = a[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    c = Image.new("RGBA", (FW, FH), (0, 0, 0, 0))
+    x = int(round(ANCHOR[0] - box.shape[1] / 2))
+    y = ANCHOR[1] - box.shape[0]
+    c.alpha_composite(Image.fromarray(box, "RGBA"), (max(0, x), max(0, y)))
+    return c
+
+
+def anims(base, key):
+    h, w = base.shape[:2]
+    pal = palette_of(base)
+    closed = close_eyes(base, key)
+    t0, t1, t2 = base, wag(base, -1), wag(base, -2)
+    c_t0 = closed
+    rs = lambda sx, sy, src=base: resample(src, max(1, round(w * sx)), max(1, round(h * sy)), pal)
+    return {
+        # name: (frames, fps, loop)
+        "sit": ([t0, t0, t0, t1, t2, t1, t0, t0, c_t0, t0, t1, t0], 4, True),
+        "wash": ([base, head_tilt(closed, 2), head_tilt(closed, 3), head_tilt(closed, 2)], 4, True),
+        "sleep": ([rs(1.14, 0.66, closed), rs(1.14, 0.69, closed)], 1.2, True),
+        "stretch": ([base, rs(0.96, 1.08), rs(0.93, 1.14), rs(0.93, 1.14), rs(0.96, 1.08)], 3, False),
+        "jump": ([rs(1.08, 0.88), rs(0.94, 1.12)], 2, False),
+        "walk": ([shear_bob(base, 1, 0), shear_bob(base, 0, 2), shear_bob(base, -1, 0), shear_bob(base, 0, 2)], 7, True),
     }
-    return anims
 
 
 def main():
-    img = Image.open(SRC).convert("RGB")
+    img = Image.open(portraits.SRC).convert("RGB")
     os.makedirs(OUT, exist_ok=True)
-    meta = {"frameWidth": FW, "frameHeight": FH, "anchor": {"x": ANCHOR[0], "y": ANCHOR[1]}, "facing": "right", "animations": {}, "cats": {}, "source": "docs/design/cats/reference-cats.webp"}
+    maxf = 12
+    meta = {"frameWidth": FW, "frameHeight": FH, "anchor": {"x": ANCHOR[0], "y": ANCHOR[1]}, "facing": "front", "animations": {}, "cats": {}, "source": "docs/design/cats/reference-cats.webp"}
     sheets = []
-    for name, ko, x0, x1 in COLUMNS:
-        anims = build_breed(cut_column(img, name, x0, x1))
-        sheet = Image.new("RGBA", (FW * 5, FH * len(anims)), (0, 0, 0, 0))
-        for r, (an, (fr, fps, loop)) in enumerate(anims.items()):
-            for i, f in enumerate(fr):
-                cell = Image.new("RGBA", (FW, FH), (0, 0, 0, 0))
-                place(f, cell)
-                sheet.alpha_composite(cell, (i * FW, r * FH))
-            meta["animations"].setdefault(an, {"row": r, "frames": len(fr), "fps": fps, "loop": loop})
-        sheet.save(os.path.join(OUT, f"{name}.png"))
-        meta["cats"][name] = {"name": ko, "file": f"{name}.png"}
+    for key in portraits.BOXES:
+        base = portraits.crisp(img, key)
+        an = anims(base, key)
+        sheet = Image.new("RGBA", (FW * maxf, FH * len(an)), (0, 0, 0, 0))
+        for r, (name, (frames, fps, loop)) in enumerate(an.items()):
+            for i, f in enumerate(frames):
+                sheet.alpha_composite(cell(f), (i * FW, r * FH))
+            meta["animations"].setdefault(name, {"row": r, "frames": len(frames), "fps": fps, "loop": loop})
+        meta["animations"]["walkfront"] = dict(meta["animations"]["walk"])
+        sheet.save(os.path.join(OUT, f"{key}.png"))
+        meta["cats"][key] = {"name": NAMES[key], "file": f"{key}.png"}
         sheets.append(sheet)
     json.dump(meta, open(os.path.join(OUT, "metadata.json"), "w"), ensure_ascii=False, indent=2)
-    S = 4
-    W = FW * 5 * S
-    prev = Image.new("RGB", (W * len(sheets), FH * len(meta["animations"]) * S), (247, 240, 228))
+    S = 3
+    W = FW * maxf * S
+    prev = Image.new("RGB", (W, FH * 6 * S * len(sheets)), (247, 240, 228))
     for k, sh in enumerate(sheets):
         up = sh.resize((sh.width * S, sh.height * S), Image.NEAREST)
-        prev.paste(up, (k * W, 0), up)
+        prev.paste(up, (0, k * FH * 6 * S), up)
     prev.save(os.path.join(ROOT, "tools", "cats", "preview.png"))
     print("wrote", len(sheets), "cats ->", OUT, list(meta["animations"]))
+
 
 if __name__ == "__main__":
     main()

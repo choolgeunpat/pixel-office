@@ -242,6 +242,7 @@ code {
   width: 100%;
   height: 100%;
   display: block;
+  image-rendering: pixelated; /* only matters mid-zoom; the canvas is normally exactly screen-sized */
 }
 .panel {
   display: none;

@@ -6,7 +6,7 @@
  */
 import { ROLES, LEAD } from "../lib/roles.js";
 import { Character } from "./sprites.js";
-import { PAL, R, box, disc, ellipse, rng, monstera, snakePlant, pothos, pot, chair, desk, screenFor, screen2For, mug } from "./art.js";
+import { PAL, R, setSnap, box, disc, ellipse, rng, monstera, snakePlant, pothos, pot, chair, desk, screenFor, screen2For, mug } from "./art.js";
 
 import { W, H, WALL, DOOR, WALK_SPEED, ORDER, coffeeSpot, BOARD, TV, LAYOUT } from "./layout.js";
 export { W, H, DOOR, ORDER, coffeeSpot, BOARD, TV, LAYOUT };
@@ -105,8 +105,7 @@ function drawBackground(ctx, mode, level) {
   const wh = 92;
   for (let y = 0; y < wh; y++) {
     const k = y / wh;
-    ctx.fillStyle = mix(sky.top, sky.bottom, k);
-    ctx.fillRect(wx, wy + y, ww, 1);
+    R(ctx, wx, wy + y, ww, 1, mix(sky.top, sky.bottom, k));
   }
   if (mode === "night") {
     const sr = rng(5);
@@ -278,8 +277,7 @@ function drawDecor(ctx, level) {
       R(ctx, x, 168, 1, 12, PAL.metal);
       ellipse(ctx, x, 184, 12, 5, PAL.gold);
       R(ctx, x - 12, 184, 24, 1, PAL.goldDark);
-      ctx.fillStyle = "rgba(255,226,150,0.13)";
-      ctx.fillRect(x - 10, 189, 20, 4);
+      R(ctx, x - 10, 189, 20, 4, "rgba(255,226,150,0.13)");
     });
   }
   if (level >= 5) {
@@ -429,12 +427,14 @@ export class OfficeScene {
     this.resize(1);
   }
 
-  /** @param scale  device pixels per world pixel (css scale × devicePixelRatio) */
+  /** @param scale  device pixels per world pixel (css scale × devicePixelRatio × zoom): the canvas is exactly screen-sized */
   resize(scale) {
-    const S = Math.max(1, Math.min(4, Math.ceil(scale)));
-    this.S = S;
-    this.canvas.width = this.bg.width = W * S;
-    this.canvas.height = this.bg.height = H * S;
+    const S = Math.max(0.5, Math.min(4, scale));
+    const w = Math.round(W * S);
+    const h = Math.round(H * S);
+    this.S = w / W;
+    this.canvas.width = this.bg.width = w;
+    this.canvas.height = this.bg.height = h;
     this.bgKey = null;
   }
 
@@ -473,6 +473,7 @@ export class OfficeScene {
     const b = this.bg.getContext("2d");
     b.setTransform(this.S, 0, 0, this.S, 0, 0);
     b.imageSmoothingEnabled = false;
+    setSnap(this.S);
     drawBackground(b, skyMode(new Date(now)), this.level);
   }
 
@@ -515,6 +516,7 @@ export class OfficeScene {
     this.ensureBackground(now);
     ctx.setTransform(S, 0, 0, S, 0, 0);
     ctx.imageSmoothingEnabled = false;
+    setSnap(S);
     ctx.drawImage(this.bg, 0, 0, W, H);
     const o = this.office;
     const t = now;
@@ -718,8 +720,7 @@ export class OfficeScene {
     // glass partition of the lead office, with an opening the lead walks through
     const gx = 628;
     const pane = (y0, y1) => {
-      ctx.fillStyle = PAL.glass;
-      ctx.fillRect(gx + 2, y0, 8, y1 - y0);
+      R(ctx, gx + 2, y0, 8, y1 - y0, PAL.glass);
       R(ctx, gx, y0, 2, y1 - y0, PAL.metal);
       R(ctx, gx + 10, y0, 2, y1 - y0, PAL.metal);
       R(ctx, gx, y0, 12, 2, PAL.metal);
@@ -730,8 +731,7 @@ export class OfficeScene {
       y: 412,
       draw: () => {
         pane(316, 412);
-        ctx.fillStyle = "rgba(190,225,240,0.16)";
-        ctx.fillRect(gx + 12, 394, W - gx - 12, 16);
+        R(ctx, gx + 12, 394, W - gx - 12, 16, "rgba(190,225,240,0.16)");
         R(ctx, gx, 410, W - gx, 3, PAL.metal);
         R(ctx, gx + 12, 394, W - gx - 12, 1, PAL.glassEdge);
         for (let x = gx + 30; x < W; x += 56) R(ctx, x, 396, 14, 1, "rgba(255,255,255,0.6)");

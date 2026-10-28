@@ -149,18 +149,32 @@ const geo = { base: 1, left: 0, top: 0, w: 0, h: 0 };
 function layout() {
   const r = stage.getBoundingClientRect();
   if (!r.width || !r.height) return;
+  const dpr = window.devicePixelRatio || 1;
   const dock = matchMedia("(max-width: 900px)").matches ? 0 : 56; // the bottom dock never covers the office
   const availH = r.height - dock;
-  const base = Math.min(r.width / W, availH / H);
-  Object.assign(geo, { base, w: r.width, h: availH, left: (r.width - W * base) / 2, top: (availH - H * base) / 2 });
-  world.style.width = `${W * base}px`;
-  world.style.height = `${H * base}px`;
+  // the canvas is exactly as many device pixels as it is shown at: no browser resampling, hard pixels
+  const fit = Math.min(r.width / W, availH / H);
+  const cw = Math.round(W * Math.min(4, fit * dpr));
+  const ch = Math.round(H * (cw / W));
+  const cssW = cw / dpr;
+  const cssH = ch / dpr;
+  const base = cssW / W;
+  const snap = (v) => Math.round(v * dpr) / dpr;
+  Object.assign(geo, { base, w: r.width, h: availH, left: snap((r.width - cssW) / 2), top: snap((availH - cssH) / 2), cssH });
+  world.style.width = `${cssW}px`;
+  world.style.height = `${cssH}px`;
   world.style.left = `${geo.left}px`;
   world.style.top = `${geo.top}px`;
   world.style.setProperty("--u", `${base}px`);
   document.documentElement.style.setProperty("--u", `${base}px`);
-  scene.resize(base * view.z * (window.devicePixelRatio || 1));
+  syncResolution();
   applyView();
+}
+
+/** keep the canvas pixel-exact for the current zoom (re-rendered at higher resolution when zoomed in) */
+function syncResolution() {
+  const want = Math.min(4, geo.base * view.z * (window.devicePixelRatio || 1));
+  if (Math.abs(want - scene.S) > 0.004 * want) scene.resize(want);
 }
 
 const clampAxis = (off, left, size, stageSize) => (size <= stageSize ? (stageSize - size) / 2 - left : Math.min(-left, Math.max(stageSize - left - size, off)));
@@ -170,9 +184,7 @@ function applyView(animate = false) {
   view.x = clampAxis(view.x, geo.left, W * geo.base * view.z, geo.w);
   view.y = clampAxis(view.y, geo.top, H * geo.base * view.z, geo.h);
   if (view.z === 1) view.x = view.y = 0;
-  // zoomed in: paint the canvas at a matching resolution so pixels stay sharp
-  const want = Math.max(1, Math.min(4, Math.ceil(geo.base * view.z * (window.devicePixelRatio || 1))));
-  if (want !== scene.S) scene.resize(want);
+  resyncSoon = true;
   world.style.transition = animate ? "transform 0.5s cubic-bezier(.2,.8,.2,1)" : "none";
   world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.z})`;
 }
@@ -395,12 +407,17 @@ function computeLooks(o, t) {
   return out;
 }
 
+let resyncSoon = false;
 let lastDraw = 0;
 function frame(ts) {
   requestAnimationFrame(frame);
   // ~30 fps is plenty for pixel animation, and a hidden tab draws nothing
   if (document.hidden || ts - lastDraw < 30) return;
   lastDraw = ts;
+  if (resyncSoon) {
+    resyncSoon = false;
+    syncResolution();
+  }
   const t = now();
   const o = currentOffice();
   scene.setOffice(o);

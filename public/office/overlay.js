@@ -7,6 +7,7 @@
 import { ALL_DESKS } from "../lib/roles.js";
 import { deskDetail, teamName } from "../lib/state.js";
 import { LAYOUT, W, H, BOARD, TV } from "./scene.js";
+import { roleIcon } from "./icons.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const pct = (x, y) => `left:${(x / W) * 100}%;top:${(y / H) * 100}%`;
@@ -34,7 +35,7 @@ export class Overlay {
         return el;
       };
       this.els[d.key] = {
-        plate: mk("plate", pct(g.cx, g.front + 21), `<b>${esc(d.name)}</b><small>${esc(d.en)}</small>`),
+        plate: mk("plate", pct(g.cx, g.front + 21), `<img src="${roleIcon(d.key, d.color)}" alt=""><b>${esc(d.name)}</b><small>${esc(d.en)}</small>`),
         card: mk("card", pct(g.cx, g.gy + 6)),
         bubble: mk("bubble", pct(g.seatX, g.seatY - 112)),
       };

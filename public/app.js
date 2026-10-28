@@ -6,7 +6,9 @@ import { ago, took } from "./lib/plain.js";
 import { startDemo } from "./lib/sim.js";
 import { loadMeta, Character } from "./office/sprites.js";
 import { OfficeScene, W, H, LAYOUT } from "./office/scene.js";
+import { Cats, loadCats } from "./office/cats.js";
 import { Overlay } from "./office/overlay.js";
+import { roleIcon } from "./office/icons.js";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -306,26 +308,31 @@ $("#company").addEventListener("click", (e) => {
 });
 
 function renderPanel(o, looks, t) {
-  // requests
-  const tickets = o.tickets.slice(-4).reverse();
+  // the request in progress (or the latest one), then finished ones
+  const latest = o.tickets[o.tickets.length - 1];
+  const teamsOf = (k) => {
+    const names = [...k.teams].filter((x) => x !== "lead").map((x) => deskByKey[x].name);
+    return names.length ? `${names.join("·")}팀이 함께 했어요` : "팀장이 직접 처리";
+  };
+  const chipOf = (k) => (k.status === "doing" ? "진행 중" : k.status === "failed" ? "문제 있음" : "완료");
+  setHtml(
+    $("#current"),
+    latest
+      ? `<div class="tk big ${latest.status}"><span class="chip">${chipOf(latest)}</span><p title="${esc(latest.title)}">${esc(latest.title)}</p><small>${latest.status === "doing" ? `${took(t - latest.startTs)} 째 진행 중` : `${took(latest.endTs - latest.startTs)} 걸렸어요`} · ${esc(teamsOf(latest))}</small></div>`
+      : `<p class="hint">아직 들어온 의뢰가 없어요. Claude에게 무언가 물어보거나 시켜 보세요.</p>`,
+  );
+  const past = o.tickets.slice(0, -1).slice(-3).reverse();
   setHtml(
     $("#tickets"),
-    tickets.length
-      ? tickets
-          .map((k) => {
-            const teams = [...k.teams].filter((x) => x !== "lead").map((x) => deskByKey[x].name);
-            const who = teams.length ? `${teams.join("·")}팀이 함께 했어요` : "팀장이 직접 처리";
-            const time = k.status === "doing" ? `${took(t - k.startTs)} 째 진행 중` : `${took(k.endTs - k.startTs)} 걸렸어요`;
-            const chip = k.status === "doing" ? "진행 중" : k.status === "failed" ? "문제 있음" : "완료";
-            return `<li class="tk ${k.status}"><span class="chip">${chip}</span><p title="${esc(k.title)}">${esc(k.title)}</p><small>${time} · ${esc(who)}</small></li>`;
-          })
-          .join("")
-      : `<li class="hint">아직 들어온 의뢰가 없어요. Claude에게 무언가 물어보거나 시켜 보세요.</li>`,
+    past.length
+      ? past.map((k) => `<li class="tk ${k.status}"><span class="chip">${chipOf(k)}</span><p title="${esc(k.title)}">${esc(k.title)}</p><small>${took(k.endTs - k.startTs)} · ${esc(teamsOf(k))}</small></li>`).join("")
+      : `<li class="hint">끝낸 의뢰가 여기에 쌓여요.</li>`,
   );
   // to-do
   const todos = o.todos;
   const done = todos.filter((x) => x.status === "completed").length;
   $("#todoCount").textContent = todos.length ? `${done}/${todos.length} 완료` : "";
+  setHtml($("#ring"), todos.length ? `<span class="ring" style="--p:${Math.round((done / todos.length) * 100)}"><b>${Math.round((done / todos.length) * 100)}%</b></span>` : "");
   setHtml(
     $("#todoList"),
     todos.length
@@ -354,7 +361,7 @@ function renderPanel(o, looks, t) {
     const el = team.querySelector(`[data-k="${d.key}"]`);
     const what = deskDetail(o, desk, look) || (look.tone === "off" ? "아직 일이 없어요" : "");
     el.classList.toggle("off", look.tone === "off");
-    setHtml(el.querySelector(".who"), `${esc(d.name)}<small>${esc(d.en)}</small>`);
+    setHtml(el.querySelector(".who"), `<img class="ri" src="${roleIcon(d.key, d.color)}" alt="">${esc(d.name)}<small>${esc(d.en)}</small>`);
     setHtml(el.querySelector(".what"), esc(what));
     el.querySelector(".what").title = what;
     const pill = el.querySelector(".pill");
@@ -388,16 +395,21 @@ function computeLooks(o, t) {
   return out;
 }
 
-function frame() {
+let lastDraw = 0;
+function frame(ts) {
+  requestAnimationFrame(frame);
+  // ~30 fps is plenty for pixel animation, and a hidden tab draws nothing
+  if (document.hidden || ts - lastDraw < 30) return;
+  lastDraw = ts;
   const t = now();
   const o = currentOffice();
   scene.setOffice(o);
   looks = computeLooks(o, t);
   scene.render(t, looks);
-  requestAnimationFrame(frame);
 }
 
 function tick() {
+  if (document.hidden) return;
   const t = now();
   const o = currentOffice();
   const lk = computeLooks(o, t);
@@ -409,6 +421,7 @@ function tick() {
   renderPanel(o, lk, t);
   renderPicker();
   renderCompany();
+  $("#clock").textContent = new Date().toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
   $("#empty").hidden = offices.size > 0 || !roomKey;
 }
 
@@ -513,7 +526,7 @@ async function copy(text) {
 
 // ------------------------------------------------------------------ boot
 async function boot() {
-  await Promise.all([loadMeta(), document.fonts.load("600 14px Pretendard"), document.fonts.load("800 14px Pretendard"), document.fonts.load("bold 11px 'Galmuri11 Bold'")]).catch(() => {});
+  await Promise.all([loadMeta(), loadCats(), document.fonts.load("600 14px Pretendard"), document.fonts.load("800 14px Pretendard"), document.fonts.load("bold 11px 'Galmuri11 Bold'")]).catch(() => {});
   let panel = window.innerWidth >= 1280 || window.innerWidth <= 900; // phones: the list sits under the office
   try {
     const saved = localStorage.getItem("po.panel");
@@ -542,6 +555,13 @@ async function boot() {
     if (path === "/") $("#hero").hidden = false;
     runDemo();
   }
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+  const applyMotion = () => {
+    scene.reduced = reduce.matches;
+    scene.setCats(new Cats({ reduced: reduce.matches }));
+  };
+  applyMotion();
+  reduce.addEventListener?.("change", applyMotion);
   layout();
   requestAnimationFrame(frame);
   setInterval(tick, 250);

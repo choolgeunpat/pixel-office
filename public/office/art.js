@@ -10,20 +10,20 @@
 
 export const PAL = {
   ink: "#1f2b40",
-  wall: "#f7f4ee",
+  wall: "#faf7f1",
   wallShade: "#ece6db",
-  slat: "#d7b48a",
-  slatDark: "#b99068",
-  slatLight: "#e8cba5",
-  sage: "#a9cdb3",
-  sageDark: "#86b394",
-  sageLight: "#c8e3cf",
+  slat: "#e4caa4",
+  slatDark: "#c9a97f",
+  slatLight: "#f1dfbf",
+  sage: "#b7d7bd",
+  sageDark: "#90bc9d",
+  sageLight: "#d5eadb",
   oak: "#ddb88c",
   oakDark: "#bf966b",
   oakLight: "#ecd0aa",
-  floor: "#e6cfab",
-  floorAlt: "#dec5a0",
-  floorSeam: "#c9ab85",
+  floor: "#f0dcbc",
+  floorAlt: "#e9d4b0",
+  floorSeam: "#d6bb94",
   white: "#fbfaf7",
   offwhite: "#e9e6e1",
   metal: "#2f3d55",
@@ -177,16 +177,18 @@ export function chair(ctx, cx, gy, color = PAL.metal, empty = false) {
   R(ctx, x + 15, y + 12, 2, 8, color);
 }
 
-export function monitor(ctx, x, y, w, h, screen) {
+export function monitor(ctx, x, y, w, h, screen, note = null) {
   // stand
-  R(ctx, x + w / 2 - 2, y + h, 4, 8, PAL.metal);
-  R(ctx, x + w / 2 - 9, y + h + 7, 18, 3, PAL.metal);
-  R(ctx, x + w / 2 - 8, y + h + 7, 16, 1, PAL.metalLight);
-  // body
-  box(ctx, x, y, w, h, PAL.metal);
-  R(ctx, x + 2, y + 2, w - 4, h - 4, PAL.screen);
-  if (screen) screen(x + 2, y + 2, w - 4, h - 4);
-  R(ctx, x + 1, y + h - 1, w - 2, 1, PAL.metalLight);
+  R(ctx, x + w / 2 - 2, y + h, 4, 7, "#b9bfcc");
+  R(ctx, x + w / 2 - 9, y + h + 6, 18, 3, "#b9bfcc");
+  R(ctx, x + w / 2 - 8, y + h + 6, 16, 1, "#d9dde6");
+  // light bezel with a navy outline
+  box(ctx, x, y, w, h, "#e6e9f0", PAL.ink);
+  R(ctx, x + 2, y + 2, w - 4, h - 5, PAL.screen);
+  if (screen) screen(x + 2, y + 2, w - 4, h - 5);
+  R(ctx, x + 1, y + h - 2, w - 2, 1, "#c9cedb");
+  R(ctx, x + w / 2 - 1, y + h - 2, 2, 1, "#8d94a6");
+  if (note) for (let k = 0; k < note.length; k++) R(ctx, x + 3 + k * 6, y - 3, 5, 5, note[k]);
 }
 
 export function laptop(ctx, x, y) {
@@ -213,54 +215,60 @@ export function mug(ctx, x, y, c = PAL.white, t = 0, steam = false) {
 /** The desk itself (top, panel, legs, gadgets). Drawn in front of the character. */
 export function desk(ctx, g, opts) {
   const { cx, gy, w } = g;
-  const { color, label, screen, t = 0, wide = false, accessories = 0 } = opts;
+  const { color, screen, screen2, t = 0, accessories = 0, busy = false } = opts;
   const half = w / 2;
   // floor shadow
   ctx.fillStyle = PAL.shadow;
   ctx.fillRect(cx - half - 2, gy - 4, w + 4, 6);
-  // legs (black sled frame)
+  // legs (slim navy frame)
   R(ctx, cx - half + 6, g.front, 4, gy - g.front, PAL.metal);
   R(ctx, cx + half - 10, g.front, 4, gy - g.front, PAL.metal);
   R(ctx, cx - half + 2, gy - 3, 14, 3, PAL.metal);
   R(ctx, cx + half - 16, gy - 3, 14, 3, PAL.metal);
-  // modesty panel (white, with role accent)
+  // modesty panel (white)
   box(ctx, cx - half + 10, g.front, w - 20, 40, PAL.white);
   R(ctx, cx - half + 11, g.front + 1, w - 22, 3, PAL.offwhite);
   R(ctx, cx - half + 11, g.front + 36, w - 22, 3, PAL.offwhite);
-  // top: oak slab
+  // top: light oak slab
   box(ctx, cx - half, g.top, w, g.front - g.top + 4, PAL.oak, PAL.ink);
   R(ctx, cx - half + 1, g.front, w - 2, 3, PAL.oakDark);
   R(ctx, cx - half + 1, g.top + 1, w - 2, 1, PAL.oakLight);
-  for (let i = 0; i < 4; i++) R(ctx, cx - half + 14 + i * 37, g.top + 6 + (i % 2) * 7, 18, 1, "#cfa274");
-  // accent desk mat in role color
-  ctx.globalAlpha = 0.55;
-  R(ctx, cx - 24, g.top + 6, 50, 12, color);
+  for (let i = 0; i < 4; i++) R(ctx, cx - half + 14 + i * 37, g.top + 6 + (i % 2) * 7, 18, 1, "#d2ab7e");
+  // soft desk mat in the role colour
+  ctx.globalAlpha = 0.5;
+  R(ctx, cx - 26, g.top + 6, 56, 13, color);
   ctx.globalAlpha = 1;
+  // dual monitors flank the seat; the left one carries sticky notes
+  const mw = 40;
+  const mh = 28;
+  const my = g.top - mh - 2;
+  monitor(ctx, cx - half + 4, my, mw, mh, screen, [color, "#ffe28c", "#ffd1d9"].slice(0, 2 + (accessories % 2)));
+  monitor(ctx, cx + half - 4 - mw, my, mw, mh, screen2);
   // keyboard + mouse
-  box(ctx, cx - 20, g.top + 8, 34, 8, "#eceef2", "#6b6e7a");
-  for (let i = 0; i < 3; i++) R(ctx, cx - 18, g.top + 10 + i * 2, 30, 1, "#c9ccd4");
-  box(ctx, cx + 17, g.top + 9, 5, 7, "#eceef2", "#6b6e7a");
-  // monitor(s): left side, screen faces the viewer (artistic licence)
-  const mw = 44;
-  const mh = 30;
-  monitor(ctx, cx - half + 6, g.top - mh - 2, mw, mh, screen);
-  if (wide) monitor(ctx, cx + half - mw - 6, g.top - mh - 2, mw, mh, screen);
-  // right side gadgets
-  if (wide) {
-    mug(ctx, cx + 30, g.top + 6, PAL.terracotta, t, true);
-    snakePlantMini(ctx, cx - 36, g.top + 16);
-  } else if (accessories % 3 === 0) {
-    mug(ctx, cx + half - 34, g.top + 4, PAL.white, t, opts.busy);
-    succulent(ctx, cx + half - 14, g.top + 14);
-  } else if (accessories % 3 === 1) {
-    lamp(ctx, cx + half - 22, g.top + 14, opts.busy);
-    mug(ctx, cx + half - 42, g.top + 6, PAL.sage, t, opts.busy);
-  } else {
-    books(ctx, cx + half - 30, g.top + 14);
-    succulent(ctx, cx + half - 10, g.top + 14);
-  }
-  // name plate
-  if (label) label(cx, g.front + 13);
+  box(ctx, cx - 20, g.top + 9, 34, 8, "#f3f4f8", "#6b6e7a");
+  for (let i = 0; i < 3; i++) R(ctx, cx - 18, g.top + 11 + i * 2, 30, 1, "#cfd2da");
+  box(ctx, cx + 18, g.top + 10, 5, 7, "#f3f4f8", "#6b6e7a");
+  // left front: a mug (steams while someone is working)
+  mug(ctx, cx - 54, g.top + 6, [PAL.white, PAL.sage, PAL.terracotta, "#cfe0f5"][accessories % 4], t, busy);
+  // right front: notepad and pencil
+  box(ctx, cx + 36, g.top + 7, 14, 11, "#fffdf6", "#9a8f7a");
+  for (let i = 0; i < 3; i++) R(ctx, cx + 38, g.top + 10 + i * 3, 9, 1, "#c9c2b0");
+  R(ctx, cx + 51, g.top + 8, 1, 10, PAL.gold);
+  // far corners: a small plant on the left, something personal on the right
+  succulent(ctx, cx - half + 14, g.top + 17);
+  const k = accessories % 3;
+  if (k === 0) lamp(ctx, cx + half - 12, g.top + 17, busy);
+  else if (k === 1) books(ctx, cx + half - 22, g.top + 17);
+  else figurine(ctx, cx + half - 12, g.top + 17, color);
+}
+
+function figurine(ctx, cx, by, c) {
+  ellipse(ctx, cx, by - 6, 4, 5, c);
+  R(ctx, cx - 3, by - 11, 2, 3, c);
+  R(ctx, cx + 1, by - 11, 2, 3, c);
+  R(ctx, cx - 2, by - 7, 1, 2, PAL.ink);
+  R(ctx, cx + 1, by - 7, 1, 2, PAL.ink);
+  R(ctx, cx - 4, by - 1, 8, 2, PAL.oakDark);
 }
 
 function succulent(ctx, cx, by) {
@@ -298,51 +306,133 @@ function books(ctx, x, by) {
 
 // ------------------------------------------------------------------ screens
 
-/** monitor content for a desk state; returns a fn(x, y, w, h) */
-export function screenFor(ctx, look, tool, color, t, seed) {
-  if (!look || look.tone === "off") {
-    return (x, y, w, h) => {
-      R(ctx, x, y, w, h, "#232836");
-      R(ctx, x + w - 12, y + 2, 2, h - 6, "rgba(255,255,255,0.06)");
-      R(ctx, x + w - 8, y + 2, 1, h - 10, "rgba(255,255,255,0.06)");
-    };
+/** What a monitor shows follows the real state: idle desks show a wallpaper, never fake "work". */
+const WALL = ["#cfe6f7", "#f7d9c8", "#e3dcf5", "#d5ecd9"];
+
+function wallpaper(ctx, x, y, w, h, seed) {
+  R(ctx, x, y, w, h, WALL[seed % WALL.length]);
+  R(ctx, x, y + h * 0.55, w, h * 0.45, "#b9d6b0");
+  R(ctx, x + w * 0.1, y + h * 0.5, w * 0.45, h * 0.15, "#a6c99d");
+  disc(ctx, x + w * 0.74, y + h * 0.28, 3, "#fff3c4");
+}
+
+function dark(ctx, x, y, w, h) {
+  R(ctx, x, y, w, h, "#232836");
+  R(ctx, x + w - 12, y + 2, 2, h - 6, "rgba(255,255,255,0.06)");
+  R(ctx, x + w - 8, y + 2, 1, h - 10, "rgba(255,255,255,0.06)");
+}
+
+function lines(ctx, x, y, w, h, seed, t, color, scroll = true) {
+  const off = scroll ? Math.floor(t / 200) : 0;
+  for (let i = 0; i < 6; i++) {
+    const k = i + off;
+    const len = ((seed * 7 + k * 13) % (w - 14)) + 6;
+    const ind = ((k * 5 + seed) % 3) * 3;
+    R(ctx, x + 3 + ind, y + 3 + i * 4, len - ind, 2, [color, "#8fb4ff", "#f7c873", "#cfd6e4", "#ff8fb1"][(k + seed) % 5]);
   }
-  if (look.anim === "sleep") {
+}
+
+/** main monitor (the one the person looks at) */
+export function screenFor(ctx, look, act, color, t, seed) {
+  if (!look || look.tone === "off") return (x, y, w, h) => dark(ctx, x, y, w, h);
+  if (look.anim === "sleep")
     return (x, y, w, h) => {
       R(ctx, x, y, w, h, "#0f1320");
-      const bx = x + 4 + ((Math.floor(t / 60) + seed * 13) % (w - 14));
-      const by = y + 3 + Math.abs(((Math.floor(t / 80) + seed * 5) % ((h - 10) * 2)) - (h - 10));
+      const bx = x + 3 + ((Math.floor(t / 60) + seed * 13) % (w - 12));
+      const by = y + 2 + Math.abs(((Math.floor(t / 80) + seed * 5) % ((h - 8) * 2)) - (h - 8));
       R(ctx, bx, by, 6, 4, color);
     };
-  }
-  const term = tool === "Bash";
-  const web = tool === "WebFetch" || tool === "WebSearch";
-  const doc = tool === "Read" || tool === "Write" || tool === "TodoWrite";
+  if (look.tone === "idle" || look.tone === "coffee") return (x, y, w, h) => wallpaper(ctx, x, y, w, h, seed);
+  if (look.tone === "done")
+    return (x, y, w, h) => {
+      R(ctx, x, y, w, h, "#effaf2");
+      for (const [dx, dy] of [[0, 3], [1, 4], [2, 5], [3, 6], [4, 5], [5, 4], [6, 3], [7, 2], [8, 1], [9, 0]]) R(ctx, x + w / 2 - 5 + dx * 1.2, y + h / 2 - 4 + dy * 1.2, 3, 3, "#1fa65a");
+    };
+  if (look.tone === "error")
+    return (x, y, w, h) => {
+      R(ctx, x, y, w, h, "#fff1f0");
+      R(ctx, x + w / 2 - 1, y + 4, 3, h - 14, "#e5484d");
+      R(ctx, x + w / 2 - 1, y + h - 8, 3, 3, "#e5484d");
+      R(ctx, x, y, w, 2, "#e5484d");
+    };
+  if (look.tone === "wait")
+    return (x, y, w, h) => {
+      R(ctx, x, y, w, h, "#fff8e8");
+      R(ctx, x + 4, y + 5, w - 8, 3, "#f1d9a3");
+      R(ctx, x + 4, y + 11, w - 16, 3, "#f1d9a3");
+      disc(ctx, x + w - 6, y + h - 6, 2, Math.floor(t / 400) % 2 ? "#e8960c" : "#f6c36a");
+    };
+  const tool = act && act.tool;
+  const kind = act && act.cmdKind;
+  if (look.anim !== "interact")
+    // thinking: a mostly blank page and a blinking cursor
+    return (x, y, w, h) => {
+      R(ctx, x, y, w, h, "#fafafa");
+      R(ctx, x + 4, y + 4, w * 0.5, 2, "#d3d7e0");
+      R(ctx, x + 4, y + 9, w * 0.3, 2, "#d3d7e0");
+      if (Math.floor(t / 450) % 2) R(ctx, x + 4 + w * 0.3 + 2, y + 9, 2, 4, color);
+    };
   return (x, y, w, h) => {
-    if (web) {
+    if (tool === "WebFetch" || tool === "WebSearch") {
       R(ctx, x, y, w, h, "#f4f6fb");
       R(ctx, x, y, w, 4, "#d8dce6");
       R(ctx, x + 6, y + 1, w - 20, 2, "#ffffff");
-      R(ctx, x + 3, y + 7, w - 6, 8, color);
-      for (let i = 0; i < 3; i++) R(ctx, x + 3, y + 18 + i * 3, ((seed * 7 + i * 13 + Math.floor(t / 400)) % (w - 12)) + 6, 1, "#9aa3b5");
+      R(ctx, x + 3, y + 7, w - 6, 7, color);
+      for (let i = 0; i < 3; i++) R(ctx, x + 3, y + 17 + i * 3, ((seed * 7 + i * 13 + Math.floor(t / 400)) % (w - 12)) + 6, 1, "#9aa3b5");
       return;
     }
-    if (doc) {
+    if (tool === "Bash" && kind === "test") {
+      R(ctx, x, y, w, h, "#0f1722");
+      const prog = (Math.floor(t / 250) % 12) / 11;
+      for (let i = 0; i < 4; i++) {
+        R(ctx, x + 3, y + 3 + i * 4, 3, 2, i < 3 || prog > 0.9 ? "#5ee08a" : "#f7c873");
+        R(ctx, x + 8, y + 3 + i * 4, 8 + ((seed + i * 7) % (w - 20)), 2, "#8d9bb5");
+      }
+      R(ctx, x + 3, y + h - 4, w - 6, 2, "#26324a");
+      R(ctx, x + 3, y + h - 4, (w - 6) * prog, 2, "#5ee08a");
+      return;
+    }
+    if (tool === "Bash") {
+      R(ctx, x, y, w, h, "#0b0f14");
+      lines(ctx, x, y, w, h, seed, t * 1.6, "#5ee08a");
+      return;
+    }
+    if (tool === "Edit" || tool === "MultiEdit") {
+      R(ctx, x, y, w, h, PAL.screen);
+      lines(ctx, x, y, w, h, seed, t, color, false);
+      R(ctx, x + 1, y + 7, 2, 2, "#5ee08a");
+      R(ctx, x + 1, y + 11, 2, 2, "#ff7a7a");
+      return;
+    }
+    if (tool === "Read" || tool === "Write" || tool === "TodoWrite") {
       R(ctx, x, y, w, h, "#fafafa");
       const off = Math.floor(t / 180) % 4;
-      for (let i = 0; i < 7; i++) R(ctx, x + 4, y + 3 + i * 4 - off + 4, ((seed * 11 + i * 17) % (w - 14)) + 8, 1, i % 3 ? "#9aa0ad" : color);
+      for (let i = 0; i < 6; i++) R(ctx, x + 4, y + 3 + i * 4 - off + 4, ((seed * 11 + i * 17) % (w - 14)) + 8, 1, i % 3 ? "#9aa0ad" : color);
       R(ctx, x, y, w, 2, "#fafafa");
       return;
     }
-    R(ctx, x, y, w, h, term ? "#0b0f14" : PAL.screen);
-    const off = Math.floor(t / (term ? 120 : 220));
-    const cols = term ? ["#5ee08a", "#5ee08a", "#cfd6e4"] : [color, "#8fb4ff", "#f7c873", "#cfd6e4", "#ff8fb1"];
-    for (let i = 0; i < 7; i++) {
-      const k = i + off;
-      const len = ((seed * 7 + k * 13) % (w - 14)) + 5;
-      const ind = term ? 0 : ((k * 5 + seed) % 3) * 3;
-      R(ctx, x + 3 + ind, y + 2 + i * 4, len - ind, 2, cols[(k + seed) % cols.length]);
+    if (tool === "Grep" || tool === "Glob") {
+      R(ctx, x, y, w, h, "#f6f7fb");
+      R(ctx, x + 3, y + 2, w - 6, 4, "#e1e5ee");
+      for (let i = 0; i < 4; i++) R(ctx, x + 4, y + 8 + i * 4, ((seed + i * 9) % (w - 18)) + 8, 2, i === Math.floor(t / 350) % 4 ? color : "#b8bfce");
+      return;
     }
-    if (Math.floor(t / 400) % 2) R(ctx, x + 3, y + h - 4, 3, 2, "#ffffff");
+    R(ctx, x, y, w, h, PAL.screen);
+    lines(ctx, x, y, w, h, seed, t, color);
+  };
+}
+
+/** second monitor: reference material while working, a calm wallpaper otherwise */
+export function screen2For(ctx, look, color, t, seed) {
+  if (!look || look.tone === "off") return (x, y, w, h) => dark(ctx, x, y, w, h);
+  if (look.anim === "sleep") return (x, y, w, h) => R(ctx, x, y, w, h, "#0f1320");
+  if (look.tone !== "busy") return (x, y, w, h) => wallpaper(ctx, x, y, w, h, seed + 1);
+  return (x, y, w, h) => {
+    R(ctx, x, y, w, h, "#fbfbfd");
+    R(ctx, x, y, w, 4, color);
+    const bars = [0.5, 0.8, 0.35, 0.65];
+    bars.forEach((b, i) => R(ctx, x + 4 + i * 7, y + h - 3 - b * (h - 12) * (0.85 + 0.15 * Math.sin(t / 500 + i + seed)), 5, b * (h - 12) * (0.85 + 0.15 * Math.sin(t / 500 + i + seed)), i % 2 ? "#9db8e8" : color));
+    R(ctx, x + w - 12, y + 7, 8, 1, "#c9cfdc");
+    R(ctx, x + w - 12, y + 10, 6, 1, "#c9cfdc");
   };
 }

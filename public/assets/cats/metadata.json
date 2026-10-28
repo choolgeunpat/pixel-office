@@ -1,0 +1,69 @@
+{
+  "frameWidth": 40,
+  "frameHeight": 32,
+  "anchor": {
+    "x": 20,
+    "y": 30
+  },
+  "facing": "right",
+  "animations": {
+    "walk": {
+      "row": 0,
+      "frames": 4,
+      "fps": 8,
+      "loop": true
+    },
+    "sit": {
+      "row": 1,
+      "frames": 4,
+      "fps": 3,
+      "loop": true
+    },
+    "wash": {
+      "row": 2,
+      "frames": 4,
+      "fps": 4,
+      "loop": true
+    },
+    "sleep": {
+      "row": 3,
+      "frames": 2,
+      "fps": 1.2,
+      "loop": true
+    },
+    "stretch": {
+      "row": 4,
+      "frames": 4,
+      "fps": 3,
+      "loop": false
+    },
+    "jump": {
+      "row": 5,
+      "frames": 2,
+      "fps": 2,
+      "loop": false
+    }
+  },
+  "cats": {
+    "mochi": {
+      "name": "모찌",
+      "file": "mochi.png"
+    },
+    "midnight": {
+      "name": "까망",
+      "file": "midnight.png"
+    },
+    "cloud": {
+      "name": "구름",
+      "file": "cloud.png"
+    },
+    "munchkin": {
+      "name": "크림",
+      "file": "munchkin.png"
+    },
+    "calico": {
+      "name": "미미",
+      "file": "calico.png"
+    }
+  }
+}

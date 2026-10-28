@@ -6,29 +6,11 @@
  */
 import { ROLES, LEAD } from "../lib/roles.js";
 import { Character } from "./sprites.js";
-import { PAL, R, box, disc, ellipse, rng, monstera, snakePlant, pothos, pot, deskGeom, chair, desk, screenFor, mug } from "./art.js";
+import { PAL, R, box, disc, ellipse, rng, monstera, snakePlant, pothos, pot, chair, desk, screenFor, screen2For, mug } from "./art.js";
 
-export const W = 880;
-export const H = 600;
-const WALL = 168;
+import { W, H, WALL, DOOR, WALK_SPEED, ORDER, coffeeSpot, BOARD, TV, LAYOUT } from "./layout.js";
+export { W, H, DOOR, ORDER, coffeeSpot, BOARD, TV, LAYOUT };
 const FONT_B = "bold 11px 'Galmuri11 Bold', monospace";
-export const DOOR = { x: 44, y: 190 };
-const WALK_SPEED = 0.11; // world px per ms
-export const ORDER = ["lead", "plan", "dev", "test", "mkt", "design", "review"];
-export const coffeeSpot = (key) => ({ x: 100 + ORDER.indexOf(key) * 22, y: 188 });
-export const BOARD = { x: 446, y: 16, w: 180, h: 98 };
-export const TV = { x: 724, y: 30, w: 140, h: 78 };
-
-/** desk positions: two rows of three + the lead's glass office */
-export const LAYOUT = {
-  plan: deskGeom(162, 290),
-  dev: deskGeom(342, 290),
-  test: deskGeom(522, 290),
-  mkt: deskGeom(162, 496),
-  design: deskGeom(342, 496),
-  review: deskGeom(522, 496),
-  lead: deskGeom(762, 340, 172),
-};
 
 export function skyMode(date) {
   const h = date.getHours() + date.getMinutes() / 60;
@@ -203,6 +185,50 @@ function drawBackground(ctx, mode, level) {
   ellipse(ctx, 764, 524, 96, 41, "#f0dcc6");
   for (let i = 0; i < 3; i++) ellipse(ctx, 764, 524, 84 - i * 24, 34 - i * 10, i % 2 ? "#f0dcc6" : "#e9d1b9");
 
+  // ---------------- sunlight through the window, falling across the floor
+  if (mode !== "night") {
+    const beam = mode === "day" ? "rgba(255,244,205,0.16)" : "rgba(255,196,130,0.2)";
+    for (let k = 0; k < 3; k++) {
+      const x0 = 236 + k * 62;
+      ctx.fillStyle = beam;
+      ctx.beginPath();
+      ctx.moveTo(x0, WALL + 6);
+      ctx.lineTo(x0 + 34, WALL + 6);
+      ctx.lineTo(x0 + 34 + 150, 470);
+      ctx.lineTo(x0 + 150, 470);
+      ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = "rgba(150,170,255,0.07)";
+    ctx.beginPath();
+    ctx.moveTo(250, WALL + 6);
+    ctx.lineTo(410, WALL + 6);
+    ctx.lineTo(540, 440);
+    ctx.lineTo(380, 440);
+    ctx.fill();
+  }
+
+  // ---------------- curtains with tie-backs
+  const drape = (x, flip) => {
+    R(ctx, x, 22, 24, 104, "#f4ece0");
+    for (let i = 0; i < 5; i++) R(ctx, x + 2 + i * 5, 24, 2, 100, i % 2 ? "#e6dac9" : "#fbf5ec");
+    R(ctx, x, 22, 24, 3, "#c9b79d");
+    R(ctx, x + (flip ? -1 : 23), 76, 3, 8, PAL.sage);
+    R(ctx, x, 78, 24, 4, PAL.sage);
+    R(ctx, x, 78, 24, 1, PAL.sageLight);
+  };
+  drape(wx - 20, false);
+  drape(wx + ww - 4, true);
+  R(ctx, wx - 24, 20, ww + 48, 3, PAL.metal); // rod
+
+  // ---------------- pet beds
+  for (const [bx, by, c, d] of [[130, 580, "#c9d8f0", "#a7bde0"], [612, 582, "#f5c9c0", "#e2a79c"], [840, 580, "#d9ead3", "#b8d3ae"]]) {
+    ellipse(ctx, bx, by + 2, 24, 8, "rgba(60,40,20,0.14)");
+    ellipse(ctx, bx, by, 22, 8.5, d);
+    ellipse(ctx, bx, by - 1, 19, 6.5, c);
+    ellipse(ctx, bx, by - 1, 10, 3.2, mix(c, "#ffffff", 0.35));
+  }
+
   // ---------------- whiteboard + TV frames (their text is HTML, see overlay.js)
   box(ctx, BOARD.x, BOARD.y, BOARD.w, BOARD.h, PAL.white, "#9aa0ab");
   R(ctx, BOARD.x + 2, BOARD.y + BOARD.h - 2, BOARD.w - 4, 4, "#c6cbd3");
@@ -290,6 +316,37 @@ function mix(a, b, t) {
 
 // ------------------------------------------------------------------ text helpers
 
+// ------------------------------------------------------------------ small pixel emotes above heads
+const EMOTES = {
+  spark: { c: "#f2b62e", b: ["...#...", "...#...", ".#.#.#.", "#######", ".#.#.#.", "...#...", "...#..."] },
+  bang: { c: "#e5484d", b: ["..###..", "..###..", "..###..", "..###..", ".......", "..###..", "..###.."] },
+  ask: { c: "#e8960c", b: [".#####.", "#.....#", "......#", "...###.", "...#...", ".......", "...#..."] },
+  z: { c: "#7d8fc9", b: ["#####", "...#.", "..#..", ".#...", "#####"] },
+};
+
+function drawEmote(ctx, kind, x, y, t) {
+  const e = EMOTES[kind];
+  if (!e) return;
+  const bob = Math.round(Math.sin(t / 260) * 1.2);
+  e.b.forEach((row, j) => [...row].forEach((ch, i) => ch === "#" && R(ctx, x + i, y + j + bob, 1, 1, e.c)));
+}
+
+function drawDots(ctx, x, y, t) {
+  const n = Math.floor(t / 320) % 4;
+  for (let i = 0; i < 3; i++) R(ctx, x + i * 4, y + 3, 3, 3, i < n ? "#8b93a8" : "#d3d7e0");
+}
+
+/** every character moves a little differently, so nobody breathes in sync */
+const PHASE = {
+  lead: { off: 0, rate: 1 },
+  plan: { off: 713, rate: 0.94 },
+  dev: { off: 1291, rate: 1.05 },
+  test: { off: 407, rate: 0.97 },
+  mkt: { off: 1877, rate: 1.03 },
+  design: { off: 959, rate: 0.92 },
+  review: { off: 1553, rate: 1.07 },
+};
+
 // ------------------------------------------------------------------ walking
 
 /** the points a character passes between two places (hub = the door) */
@@ -365,6 +422,8 @@ export class OfficeScene {
     this.seenTasks = new Map();
     this.office = null;
     this.instant = true;
+    this.reduced = false; // prefers-reduced-motion: nobody walks, no confetti, cats stay put
+    this.cats = null;
     this.frame = { looks: {}, actors: {} };
     this.lastT = 0;
     this.resize(1);
@@ -392,8 +451,13 @@ export class OfficeScene {
     this.level = level;
   }
 
+  setCats(cats) {
+    this.cats = cats;
+  }
+
   /** confetti from a world point */
   burst(x, y, n = 28) {
+    if (this.reduced) return;
     const colors = ["#f2c14e", "#ef9a7a", "#7cc77a", "#7fb0ff", "#ff8fb1", "#ffffff"];
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
@@ -416,7 +480,8 @@ export class OfficeScene {
   actor(key, look, now) {
     const desired = !look.present ? "away" : look.coffee ? "coffee" : "seat";
     let a = this.actors[key];
-    if (!a) a = this.actors[key] = { loc: this.instant ? desired : "away", walk: null };
+    const inst = this.instant || this.reduced;
+    if (!a) a = this.actors[key] = { loc: inst ? desired : "away", walk: null };
     if (a.walk && a.walk.to !== desired) {
       // changed their mind mid-way: turn around and go back the way they came
       const w = a.walk;
@@ -425,7 +490,7 @@ export class OfficeScene {
       const len = lengthOf(pts);
       a.walk = { pts, t0: now, len, dur: Math.max(1, len / WALK_SPEED), from: w.from, to: desired };
     } else if (!a.walk && a.loc !== desired) {
-      if (this.instant) a.loc = desired;
+      if (inst) a.loc = desired;
       else {
         const pts = route(a.loc, desired, key);
         const len = lengthOf(pts);
@@ -465,12 +530,12 @@ export class OfficeScene {
       const seated = !!pos && pos.loc === "seat";
       const ch = this.chars[d.key];
       items.push({ y: g.seatY - 1, draw: () => chair(ctx, g.cx, g.gy, d.color, !seated) });
-      if (pos && pos.loc === "walking") items.push({ y: pos.y, draw: () => ch.draw(ctx, "walk", pos.dir, pos.x, pos.y, t) });
+      if (pos && pos.loc === "walking") items.push({ y: pos.y, draw: () => ch.draw(ctx, "walk", pos.dir, pos.x, pos.y, t * PHASE[d.key].rate + PHASE[d.key].off) });
       else if (pos && pos.loc === "coffee")
         items.push({
           y: pos.y,
           draw: () => {
-            ch.draw(ctx, "idle", "back", pos.x, pos.y, t);
+            ch.draw(ctx, "idle", "back", pos.x, pos.y, t * PHASE[d.key].rate + PHASE[d.key].off);
             mug(ctx, pos.x + 9, pos.y - 46, PAL.white, t, true);
           },
         });
@@ -478,9 +543,12 @@ export class OfficeScene {
         // the sit/sleep frames sit lower in the frame; lift them so the shoulders clear the desk
         const anim = look.anim || "sit";
         const lift = anim === "sit" || anim === "sleep" ? 8 : 0;
-        items.push({ y: g.seatY, draw: () => ch.draw(ctx, anim, "front", pos.x, pos.y - lift, t + d.key.length * 333) });
+        items.push({ y: g.seatY, draw: () => ch.draw(ctx, anim, "front", pos.x, pos.y - lift, t * PHASE[d.key].rate + PHASE[d.key].off) });
       }
       const busy = look.tone === "busy";
+      const act = o && o.desks[d.key].act;
+      const seatLook = seated ? look : null;
+      const seed = d.key.charCodeAt(0) + d.key.length;
       items.push({
         y: g.gy,
         draw: () =>
@@ -488,16 +556,38 @@ export class OfficeScene {
             color: d.color,
             t,
             busy,
-            wide: d.key === "lead",
             accessories: ROLES.indexOf(d),
-            screen: screenFor(ctx, seated ? look : null, o && o.desks[d.key].act && o.desks[d.key].act.tool, d.color, t, d.key.charCodeAt(0) + d.key.length),
+            screen: screenFor(ctx, seatLook, act, d.color, t, seed),
+            screen2: screen2For(ctx, seatLook, d.color, t, seed),
           }),
       });
     }
     this.lounge(items, t);
     this.glassWall(items);
+    if (this.cats) {
+      this.cats.update(t);
+      items.push(...this.cats.items(ctx, t, S));
+    }
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();
+
+    // emotes follow the real state of each desk
+    for (const d of [LEAD, ...ROLES]) {
+      const pos = actors[d.key];
+      if (!pos || pos.loc !== "seat") continue;
+      const look = looks[d.key];
+      const g = LAYOUT[d.key];
+      const ex = g.seatX + 22;
+      const ey = g.seatY - 96;
+      if (look.tone === "done") drawEmote(ctx, "spark", ex, ey, t);
+      else if (look.tone === "error") drawEmote(ctx, "bang", ex, ey, t);
+      else if (look.tone === "wait") drawEmote(ctx, "ask", ex, ey, t);
+      else if (look.tone === "busy" && look.anim === "sit") drawDots(ctx, ex - 2, ey + 2, t);
+      else if (look.anim === "sleep") {
+        const k = Math.floor(t / 700) % 3;
+        drawEmote(ctx, "z", ex - 2 + k * 3, ey + 4 - k * 4, 0);
+      }
+    }
 
     this.delegations(ctx, o, now);
     this.drawParticles(ctx, now);

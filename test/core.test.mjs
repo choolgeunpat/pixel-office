@@ -180,3 +180,11 @@ test("tool wording is plain language", async () => {
   assert.equal(action("Edit", "x/login.tsx").short, "수정하는 중");
   assert.equal(action("mcp__slack__post", "").long, "연결된 앱을 쓰고 있어요");
 });
+
+test("cat sprites: five breeds with the animation rows the behaviour needs", async () => {
+  const fs = await import("node:fs");
+  const meta = JSON.parse(fs.readFileSync(new URL("../public/assets/cats/metadata.json", import.meta.url), "utf8"));
+  assert.equal(Object.keys(meta.cats).length, 5);
+  for (const a of ["walk", "sit", "wash", "sleep", "stretch", "jump"]) assert.ok(meta.animations[a], a);
+  for (const c of Object.values(meta.cats)) assert.ok(fs.existsSync(new URL(`../public/assets/cats/${c.file}`, import.meta.url)), c.file);
+});

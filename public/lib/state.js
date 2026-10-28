@@ -138,7 +138,7 @@ export function apply(o, ev) {
     case "tool_start": {
       arrive(desk, ts);
       setPhase(desk, "tool", ts);
-      desk.act = { ...action(ev.tool, ev.target, ev.cmdKind), tool: ev.tool };
+      desk.act = { ...action(ev.tool, ev.target, ev.cmdKind), tool: ev.tool, cmdKind: ev.cmdKind };
       desk.toolCount++;
       o.stats.tools++;
       const tk = currentTicket(o);

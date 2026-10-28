@@ -14,12 +14,14 @@
         <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="12" width="5" height="10" /><rect x="9" y="3" width="6" height="19" /><rect x="17" y="8" width="5" height="14" /></svg>
         <span class="wordmark">PIXEL<br />OFFICE</span>
       </a>
+      <span class="tagline">지금, 아이디어를 현실로 만들고 있어요</span>
       <div class="pick" id="pickWrap" hidden>
         <select id="sessionSelect" aria-label="볼 세션 고르기"></select>
         <a class="open" id="btnOpenSession" href="#" target="_blank" rel="noopener" hidden>세션 열기 ↗</a>
       </div>
       <div class="spacer"></div>
       <div class="conn" id="conn"><i></i><span>연결 중…</span></div>
+      <span class="clock" id="clock"></span>
       <button class="btn" id="btnDemo" hidden>▶ 데모</button>
       <button class="btn" id="btnCopy" hidden>🔗 링크 복사</button>
       <button class="btn" id="btnSetup">⚙ 연결 방법</button>
@@ -65,13 +67,17 @@
       </section>
 
       <aside class="panel" id="panel" aria-label="업무 현황">
-        <section class="sec">
-          <h2>오늘의 의뢰</h2>
-          <ul class="tickets" id="tickets"></ul>
+        <section class="sec cur">
+          <div class="curhd"><h2>지금 요청</h2><span id="ring"></span></div>
+          <div id="current"></div>
         </section>
         <section class="sec">
           <h2>할 일 <small id="todoCount"></small></h2>
           <ul class="todos" id="todoList"></ul>
+        </section>
+        <section class="sec">
+          <h2>끝낸 의뢰</h2>
+          <ul class="tickets" id="tickets"></ul>
         </section>
         <section class="sec">
           <h2>팀원</h2>
